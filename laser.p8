@@ -5,9 +5,9 @@ __lua__
 -- casey labrack
 
 p = {x=50,y=30,dx=0,dy=0,a=0,t=1,rt=.05,r=3,lb=0}
-l = {a=0,x=0,y=0,speed=.005}
+lz= {} --lasers
+zs= {} --safe zones
 b = {x=0,y=0,a=0,r=1,speed=5,enabled=false}
-z = {a=0,r=30,x=0,y=0,shrinking=false,speed=1}
 inner = {x=64,y=64,r=6}
 maxrspeed=1
 minrspeed=.1
@@ -17,68 +17,32 @@ isgameover=false
 rs={}
 
 function _init()
---init zone
-z.a=rnd(1)
-z.x=cos(a)*63
-z.y=sin(a)*63
-z.r=30
-
---init roids
-	local a,d,x,y,dx,dy
-	for i=1,7 do
-		flag=true
-		while flag do
-			a=rnd(1)
-			d=6+rnd(63-6)
-			x=64+cos(a)*d
-			y=64+sin(a)*d
---			dx=rnd(2)-1
---			dy=rnd(2)-1
-			
-			if dist(x,y,p.x,p.y)<20 then
-				flag=true else flag=false
-			end
-		end
-		
-		local atop=atan2(x-p.x,y-p.y)
---		local atop=atan2(p.x-x,p.y-y)
-		dx=cos(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
-		dy=sin(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
---		if atop-atan2(dx,dy)<.2 then
---			a+=.25+rnd(.5)
---		end
-		
-		add(rs,{
-			x=64+cos(a)*d,
-			y=64+sin(a)*d,
-			r=3+rnd(8-3),
-			dx=dx,
-			dy=dy
---			dx=rnd(2)-1,
---			dy=rnd(2)-1
-		})
-	end
+lvls[lvl]()
 end
 
 function _update()
 -- laser move
-l.a-= l.speed
-l.x = 64 + cos(l.a) * 63
-l.y = 64 + sin(l.a) * 63
-
--- safe zone
-if z.shrinking then
---if touching(p,z) then
-	z.r-=.25--z.speed
-	if z.r<2 then
-		z.a=rnd(1)
-		z.x=64+cos(z.a)*63
-		z.y=64+sin(z.a)*63
-		z.r=30
-		z.shrinking=false
-	end
+for l in all(lz) do
+	l.a-= l.speed
+	l.x = 64 + cos(l.a) * 63
+	l.y = 64 + sin(l.a) * 63
 end
-if touching(p,z) then z.shrinking=true end
+
+-- safe zones
+for z in all(zs) do
+	if z.shrinking then
+	--if touching(p,z) then
+		z.t-=.25--z.speed
+		if z.t<2 then
+			z.a=rnd(1)
+			z.x=64+cos(z.a)*63
+			z.y=64+sin(z.a)*63
+			z.t=32
+			z.shrinking=false
+		end
+	end
+	if touching(p,z) then z.shrinking=true end
+end
 
 --	player move
 if btn(➡️) then p.a=p.a-p.rt end
@@ -119,7 +83,7 @@ if dist(p.x,p.y,64,64) < 8 then
 end
 
 -- player vs. obstacles
-for _,v in pairs(rs) do
+for v in all(rs) do
 	if v.x>-5 and v.x<134 and v.y>-5 and v.y<134 then
 		if dist(p.x,p.y,v.x,v.y)<p.r+v.r then
 			gameover=true
@@ -130,11 +94,16 @@ end
 
 --laser/player collision
 local d=dist(p.x,p.y,64,64)
---if dist(p.x,p.y,hx,hy) < 3 then
-if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
-	if not touching(p,z) then
-		gameover=true
-		_update=function() end
+local vulnerable=true
+for z in all(zs) do
+	if touching(p,z) then vulnerable=false break end
+end
+if vulnerable then
+	for l in all(lz) do
+		if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
+			gameover=true
+			_update=function() end
+		end
 	end
 end
 
@@ -181,18 +150,28 @@ for v in all(rs) do
 		if v.r<2 then	del(rs,v) end
 	end	
 end
+
+--level win
+if #rs==0 then 
+	lvl+=1
+	lvls[lvl]()
+end
+
 end
 
 function _draw()
 cls()
 
 --safe zone
-fillp(░)
-circfill(z.x,z.y,z.r,0x08)
-fillp()
-circ(z.x,z.y,z.r,8)
+for z in all(zs) do
+	fillp(░)
+	circfill(z.x,z.y,z.r,0x08)
+	fillp()
+	circfill(z.x,z.y,z.r-z.t,0)
+	circ(z.x,z.y,z.r,8)
+end
 
-line(64,64,l.x,l.y,8) --laser
+for l in all(lz) do line(64,64,l.x,l.y,8) end --laser
 circfill(64,64,4,8) --inner
 circ(64,64,4,6) --inner2
 circ(64,64,63,6) --outer
@@ -225,8 +204,7 @@ end
 end
 
 -->8
---cos1 = cos function cos(angle) return cos1(angle/(3.1415*2)) end
---sin1 = sin function sin(angle) return -sin1(angle/(3.1415*2)) end
+--utils
 
 function dist(x1,y1,x2,y2)
 	return sqrt((x1-x2) * (x1-x2)+(y1-y2)*(y1-y2))
@@ -238,6 +216,67 @@ end
 
 function touching(a,b)
 	return distt(a,b)<a.r+b.r
+end
+-->8
+--levels
+lvls={}
+lvls[1]=function() 
+	for i=1,4 do spawnroid() end
+	spawnzone()
+	add(lz,{a=0,x=0,y=0,speed=.005})
+end
+lvls[2]=function()
+	for i=1,7 do spawnroid() end
+end
+lvls[3]=function()
+	for i=1,4 do spawnroid() end
+	add(lz,{a=.5,x=0,y=0,speed=.005})
+--	add(lz,{a=0,x=0,y=0,speed=.005})
+end
+lvls[4]=function()
+	for i=1,4 do spawnroid() end
+	deli(lz,2)
+end
+
+function spawnzone()
+	local z = {a=0,r=32,x=0,y=0,t=32,shrinking=false,speed=1}
+	z.a=rnd(1)
+	z.x=64+cos(z.a)*63
+	z.y=64+sin(z.a)*63
+	add(zs,z)
+end
+
+function spawnroid()
+local a,d,x,y,dx,dy
+	flag=true
+	while flag do
+		a=rnd(1)
+		d=6+rnd(63-6)
+		x=64+cos(a)*d
+		y=64+sin(a)*d
+		
+		if dist(x,y,p.x,p.y)<20 then
+			flag=true else flag=false
+		end
+	end
+	
+	local atop=atan2(x-p.x,y-p.y)
+--		local atop=atan2(p.x-x,p.y-y)
+	dx=cos(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
+	dy=sin(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
+--		if atop-atan2(dx,dy)<.2 then
+--			a+=.25+rnd(.5)
+--		end
+	
+	add(rs,{
+		x=64+cos(a)*d,
+		y=64+sin(a)*d,
+		r=3+rnd(8-3),
+		dx=dx,
+		dy=dy
+--			dx=rnd(2)-1,
+--			dy=rnd(2)-1
+	})
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
