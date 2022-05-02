@@ -4,23 +4,30 @@ __lua__
 -- lasers
 -- casey labrack
 
-p = {x=50,y=30,dx=0,dy=0,a=0,t=1,rt=.05,r=3,lb=0}
+p = {x=80,y=30,dx=0,dy=0,
+					a=.75,t=.25,rt=.05,r=3,
+					friction=.92,hop=25,charge=0,fullcharge=90}
 lz= {} --lasers
 zs= {} --safe zones
+hs= {} --homing bombs
 b = {x=0,y=0,a=0,r=1,speed=5,enabled=false}
 inner = {x=64,y=64,r=6}
-maxrspeed=1
-minrspeed=.1
-lvl=1
+outer = {x=64,y=64,r=63}
+maxrspeed=2
+minrspeed=.5
+lvl=2
 log = ""
 isgameover=false
 rs={}
+tick=0
 
 function _init()
 lvls[lvl]()
 end
 
 function _update()
+tick+=1
+
 -- laser move
 for l in all(lz) do
 	l.a-= l.speed
@@ -44,20 +51,42 @@ for z in all(zs) do
 	if touching(p,z) then z.shrinking=true end
 end
 
+--homing bomb move
+for h in all(hs) do
+	local a=atan2(p.x-h.x,p.y-h.y)
+	h.dx+=cos(a)*h.t
+	h.dy+=sin(a)*h.t
+	h.dx*=.97
+	h.dy*=.97
+	h.x+=h.dx
+	h.y+=h.dy
+	local a2=atan2(h.x-64,h.y-64)
+	if touching(h,inner) then
+		h.x=inner.x+cos(a2)*(inner.r+1)
+		h.y=inner.y+sin(a2)*(inner.r+1)
+	end
+	if dist(h.x,h.y,64,64)>63 then
+		h.x=64+cos(a2)*63
+		h.y=64+sin(a2)*63	
+	end
+end
+
 --	player move
+p.charge+=1
 if btn(➡️) then p.a=p.a-p.rt end
 if btn(⬅️) then p.a=p.a+p.rt end
-if btn(⬆️) and p.lb+2<t() then 
---	p.x+=cos(p.a)*8
---	p.y+=sin(p.a)*8
-	p.dx+=cos(p.a)*3
-	p.dy+=sin(p.a)*3
-	p.lb=t()
+if btn(⬆️) and p.charge>p.fullcharge then 
+	p.x+=cos(p.a)*p.hop
+	p.y+=sin(p.a)*p.hop
+--	p.dx+=cos(p.a)*6
+--	p.dy+=sin(p.a)*6
+--	p.lb=t()
+	p.charge=0
 end
 if btn(⬇️) then	p.dx=0 p.dy=0 end
 if btn(🅾️) then 
-	p.dx=p.dx+cos(p.a)*.1
-	p.dy=p.dy+sin(p.a)*.1
+	p.dx+=cos(p.a)*p.t
+	p.dy+=sin(p.a)*p.t
 end
 if btn(❎) and not b.enabled then
 	b.enabled=true
@@ -65,8 +94,8 @@ if btn(❎) and not b.enabled then
 end
 p.x=p.x+p.dx
 p.y=p.y+p.dy
-p.dx=p.dx*.96
-p.dy=p.dy*.96
+p.dx*=p.friction
+p.dy*=p.friction
 
 local ang=atan2(p.x-64,p.y-64)
 
@@ -77,18 +106,24 @@ if dist(p.x,p.y,64,64) > 63 then
 end
 
 -- player vs inside wall
-if dist(p.x,p.y,64,64) < 8 then
+if touching(inner,p) then
 	p.x=64+cos(ang)*8 
 	p.y=64+sin(ang)*8
 end
 
 -- player vs. obstacles
 for v in all(rs) do
-	if v.x>-5 and v.x<134 and v.y>-5 and v.y<134 then
-		if dist(p.x,p.y,v.x,v.y)<p.r+v.r then
-			gameover=true
-			_update=function() end
-		end
+	if touching(p,v) then
+		gameover=true
+		_update=function() end
+	end
+end
+
+--player vs. homing bombs
+for h in all(hs) do
+	if touching(p,h) then
+		gameover=true
+		_update=function() end
 	end
 end
 
@@ -137,24 +172,46 @@ end
 
 --bullet
 if b.enabled then
-	b.x+=cos(b.a)*b.speed
-	b.y+=sin(b.a)*b.speed
+	local x1=b.x 
+	local y1=b.y
+	for i=1,10 do
+		b.x=x1+cos(b.a)*b.speed*i/10
+		b.y=y1+sin(b.a)*b.speed*i/10
+		for v in all(rs) do
+			if touching(b,v) then
+				b.enabled=false
+				v.r-=1
+				if v.r<2 then	del(rs,v) end
+				goto donebullet
+			end
+		end
+		for h in all(hs) do
+			if touching(h,b) then
+				b.enabled=false
+				del(hs,h)
+				goto donebullet
+			end
+		end
+		if touching(inner,b) then
+			b.enabled=false
+			goto donebullet
+		end
+		if not touching(outer,b) then
+			b.enabled=false
+			goto donebullet
+		end
+	end
 end
-if dist(b.x,b.y,64,64)>63 then b.enabled=false end
-if touching(b,inner) then b.enabled=false end
-for v in all(rs) do
---	if b.enabled and dist(b.x,b.y,v.x,v.y)<b.r+v.r then
-	if b.enabled and touching(b,v) then
-		v.r-=1
-		b.enabled=false
-		if v.r<2 then	del(rs,v) end
-	end	
-end
+::donebullet::
 
 --level win
-if #rs==0 then 
+if #rs==0 and #hs==0 then 
 	lvl+=1
-	lvls[lvl]()
+	lz={}
+	zs={}
+	hs={}
+	p.x=64 p.y=30
+	if lvls[lvl] then lvls[lvl]() end
 end
 
 end
@@ -162,26 +219,74 @@ end
 function _draw()
 cls()
 
+circ(64,64,63,6) -- outer
+
+--emitter
+circ(64,64,inner.r,6)
+circ(64,64,1,8)
+if #lz==0 then circ(64,64,1,2) end
+
+--homing bombs
+for h in all(hs) do
+	spr(tick%2+3,h.x-4,h.y-4)
+end
+
 --safe zone
 for z in all(zs) do
 	fillp(░)
-	circfill(z.x,z.y,z.r,0x08)
+	circfill(z.x,z.y,z.r,0x01)
+--	circfill(z.x,z.y,z.r,0x0c)
 	fillp()
 	circfill(z.x,z.y,z.r-z.t,0)
-	circ(z.x,z.y,z.r,8)
+	circ(z.x,z.y,z.r,1)
 end
 
-for l in all(lz) do line(64,64,l.x,l.y,8) end --laser
-circfill(64,64,4,8) --inner
-circ(64,64,4,6) --inner2
-circ(64,64,63,6) --outer
+--laser
+for l in all(lz) do 	
+	if rnd(1)>.33 then  
+	line(64,64,l.x,l.y,8)
+--		circfill(l.x,l.y,rnd(3),8)
+	end
+end
+--burn trail
+for l in all(lz) do
+	for i=1,5 do
+		local a=l.a+.0025*i
+		local f=8
+--		if i>3 then f=2 end
+		circfill(64+cos(a)*63,64+sin(a)*63,.75,f)
+	--	pset(64+cos(a)*63,64+sin(a)*63,f)
+	end
+end
+
 --player
-circfill(p.x,p.y,p.r,14) 
-line(p.x,p.y,p.x+cos(p.a)*6,p.y+sin(p.a)*6)
+--circfill(p.x,p.y,p.r,14) 
+--line(p.x,p.y,p.x+cos(p.a)*6,p.y+sin(p.a)*6)
+local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
+local prow=.075
+local len=6
+local aft=len-2
+if btn(🅾️) then
+line(m.x-cos(p.a-prow)*aft,
+					m.y-sin(p.a-prow)*aft,
+					m.x-cos(p.a)*(aft+1),
+					m.y-sin(p.a)*(aft+1),12)
+line(m.x-cos(p.a+prow)*aft,
+					m.y-sin(p.a+prow)*aft,
+					m.x-cos(p.a)*(aft+1),
+					m.y-sin(p.a)*(aft+1),12)
+end
+line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
+line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
+--circfill(m.x-cos(p.a)*2,m.y-sin(p.a)*2,1,7)
 
 -- roids
 for v in all(rs) do
-	circfill(v.x,v.y,v.r,9)
+--	fillp(⧗)
+--	circfill(v.x,v.y,v.r,9)
+--	fillp()
+	circ(v.x,v.y,v.r,9)
+	spr(2,v.x-4,v.y-4)
 	local a=atan2(v.dx,v.dy)-.5
 	local x=v.x+cos(a)*v.r
 	local y=v.y+sin(a)*v.r
@@ -189,17 +294,31 @@ for v in all(rs) do
 	line(x,y,x+cos(a)*m,y+sin(a)*m)
 end
 
+--bullet
 if b.enabled then
-	circfill(b.x,b.y,b.r,12)
+	local dx=cos(b.a+5)
+	local dy=sin(b.a+5)
+	line(b.x+dx*2,b.y+dy*2,b.x+dx*4,b.y+dy*4,1)
+	line(b.x,b.y,b.x+dx*2,b.y+dy*2,12)
 end
+
+--hop countdown
+local f=12
+--local rekt={x=105,y=}
+if (p.charge<p.fullcharge) f=1
+rect(105,3,126,9,f)
+local pct=p.charge/p.fullcharge
+if pct>1 then pct=1 end
+rectfill(105,3,105+(126-105)*pct,9,f)
+print("tele",106,4,7)
 
 print(log)
-print(lvl,63,63,10)
+print(lvl,0,0,10)
 
-if gameover then
---	local l=print("gameover",-10,0)
-	print("gameover",128-30,0)
-end
+--if gameover then
+----	local l=print("gameover",-10,0)
+--	print("gameover",128-30,0)
+--end
 
 end
 
@@ -222,20 +341,32 @@ end
 lvls={}
 lvls[1]=function() 
 	for i=1,4 do spawnroid() end
-	spawnzone()
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[2]=function()
 	for i=1,7 do spawnroid() end
+	spawnzone()
+	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[3]=function()
 	for i=1,4 do spawnroid() end
 	add(lz,{a=.5,x=0,y=0,speed=.005})
---	add(lz,{a=0,x=0,y=0,speed=.005})
+	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[4]=function()
 	for i=1,4 do spawnroid() end
-	deli(lz,2)
+	add(lz,{a=0,x=0,y=0,speed=.005})
+end
+lvls[5]=function()
+	local h={x=80,y=64+rnd(64),r=6,dx=0,dy=0,t=.1}
+	add(hs,h)
+	add(lz,{a=.5,x=0,y=0,speed=.005})
+end
+lvls[6]=function()
+	local h={x=80,y=64+rnd(64),r=6,dx=0,dy=0,t=.1}
+	for i=1,4 do spawnroid() end
+	add(hs,h)
+	add(lz,{a=.5,x=0,y=0,speed=.005})
 end
 
 function spawnzone()
@@ -248,17 +379,17 @@ end
 
 function spawnroid()
 local a,d,x,y,dx,dy
-	flag=true
-	while flag do
-		a=rnd(1)
-		d=6+rnd(63-6)
-		x=64+cos(a)*d
-		y=64+sin(a)*d
-		
-		if dist(x,y,p.x,p.y)<20 then
-			flag=true else flag=false
-		end
-	end
+valid=false
+while valid==false do
+	a=rnd(1)
+	d=6+rnd(63-6)
+	x=64+cos(a)*d
+	y=64+sin(a)*d
+	
+	if dist(x,y,p.x,p.y)>40 then 
+		valid=true
+	end		
+end
 	
 	local atop=atan2(x-p.x,y-p.y)
 --		local atop=atan2(p.x-x,p.y-y)
@@ -279,9 +410,11 @@ local a,d,x,y,dx,dy
 	})
 end
 __gfx__
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000006dd6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000006666660000000000e0000e00e0000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0070070066dddd660000000000eeee0000eeee000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000d6d88d6d0008000000e00e0000e88e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000d6d88d6d0080800000e00e0000e88e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0070070066dddd660008000000eeee0000eeee000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000006666660000000000e0000e00e0000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000006dd6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
