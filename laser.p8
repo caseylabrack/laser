@@ -6,27 +6,45 @@ __lua__
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
-					friction=.92,hop=25,charge=0,fullcharge=90}
+					friction=.92,hop=25,charge=0,fullcharge=90,
+					enabled=true,controllable=false,alive=true,
+					thrusting=false}
+ps= {} --player death particles
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
+as= {} --animations (coroutines)
 b = {x=0,y=0,a=0,r=1,speed=5,enabled=false}
+w = {enabled=false,start=0,duration=100,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
 maxrspeed=2
 minrspeed=.5
-lvl=2
+lvl=1
+lives=3
+passes={}
 log = ""
 isgameover=false
 rs={}
 tick=0
+lvlswitchtick=90
+transitioning=false
+scoreboxes={{0,0},{7,0},{14,0},{21,0}}
 
 function _init()
-lvls[lvl]()
+--lvls[lvl]()
+	local a=cocreate(lvls2[lvl])
+	add(as,a)
 end
 
 function _update()
 tick+=1
+
+-- do animations
+for a in all(as) do
+	if costatus(a)!="dead" then coresume(a)
+	else del(as,a) end
+end
 
 -- laser move
 for l in all(lz) do
@@ -38,7 +56,6 @@ end
 -- safe zones
 for z in all(zs) do
 	if z.shrinking then
-	--if touching(p,z) then
 		z.t-=.25--z.speed
 		if z.t<2 then
 			z.a=rnd(1)
@@ -61,9 +78,9 @@ for h in all(hs) do
 	h.x+=h.dx
 	h.y+=h.dy
 	local a2=atan2(h.x-64,h.y-64)
-	if touching(h,inner) then
-		h.x=inner.x+cos(a2)*(inner.r+1)
-		h.y=inner.y+sin(a2)*(inner.r+1)
+	if dist(h.x,h.y,64,64)<8 then
+		h.x=inner.x+cos(a2)*8
+		h.y=inner.y+sin(a2)*8
 	end
 	if dist(h.x,h.y,64,64)>63 then
 		h.x=64+cos(a2)*63
@@ -73,24 +90,30 @@ end
 
 --	player move
 p.charge+=1
-if btn(➡️) then p.a=p.a-p.rt end
-if btn(⬅️) then p.a=p.a+p.rt end
-if btn(⬆️) and p.charge>p.fullcharge then 
-	p.x+=cos(p.a)*p.hop
-	p.y+=sin(p.a)*p.hop
---	p.dx+=cos(p.a)*6
---	p.dy+=sin(p.a)*6
---	p.lb=t()
-	p.charge=0
-end
-if btn(⬇️) then	p.dx=0 p.dy=0 end
-if btn(🅾️) then 
-	p.dx+=cos(p.a)*p.t
-	p.dy+=sin(p.a)*p.t
-end
-if btn(❎) and not b.enabled then
-	b.enabled=true
-	b.x=p.x b.y=p.y b.a=p.a
+if p.controllable and p.alive then
+	if btn(➡️) then p.a=p.a-p.rt end
+	if btn(⬅️) then p.a=p.a+p.rt end
+	if btn(⬆️) and p.charge>p.fullcharge then 
+		p.x+=cos(p.a)*p.hop
+		p.y+=sin(p.a)*p.hop
+		p.charge=0
+	end
+	if btn(⬇️) then	p.dx=0 p.dy=0 end
+	if btn(🅾️) then 
+		p.dx+=cos(p.a)*p.t
+		p.dy+=sin(p.a)*p.t
+		if not p.thrusting then
+			p.thrusting=true
+			sfx(2)
+		end
+	else 
+		sfx(2,-2)
+		p.thrusting=false
+	end
+	if btn(❎) and not b.enabled then
+		b.enabled=true
+		b.x=p.x b.y=p.y b.a=p.a
+	end
 end
 p.x=p.x+p.dx
 p.y=p.y+p.dy
@@ -128,22 +151,27 @@ for h in all(hs) do
 end
 
 --laser/player collision
-local d=dist(p.x,p.y,64,64)
-local vulnerable=true
-for z in all(zs) do
-	if touching(p,z) then vulnerable=false break end
-end
-if vulnerable then
-	for l in all(lz) do
-		if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
-			gameover=true
-			_update=function() end
+if p.enabled then
+	local d=dist(p.x,p.y,64,64)
+	local vulnerable=true
+	for z in all(zs) do
+		if touching(p,z) then vulnerable=false break end
+	end
+	if vulnerable then
+		for l in all(lz) do
+			if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
+				p.enabled=false
+				add(ps,{x1=p.x,y1=p.y,x2=p.x+3,y2=p.y+3})
+	--			gameover=true
+	--			_update=function() end
+			end
 		end
 	end
 end
 
 --bouncing around
 for v in all(rs) do
+	if not v.enabled then goto continue end
 	v.x=v.x+v.dx 
 	v.y=v.y+v.dy
 	if dist(v.x,v.y,64,64)>63 then
@@ -168,6 +196,7 @@ for v in all(rs) do
 		v.dx=cos(def)*mag
 		v.dy=sin(def)*mag
 	end
+	::continue::
 end
 
 --bullet
@@ -205,15 +234,21 @@ end
 ::donebullet::
 
 --level win
-if #rs==0 and #hs==0 then 
-	lvl+=1
+if #rs==0 and #hs==0 and not transitioning then
+	nxtlvl()	
+end
+end
+
+function nxtlvl()
+	transitioning=true
 	lz={}
 	zs={}
 	hs={}
-	p.x=64 p.y=30
-	if lvls[lvl] then lvls[lvl]() end
-end
-
+	add(passes,true)
+	p.controllable=false
+	lvl+=1
+	local a=cocreate(lvls2[lvl])
+	add(as,a)
 end
 
 function _draw()
@@ -228,7 +263,7 @@ if #lz==0 then circ(64,64,1,2) end
 
 --homing bombs
 for h in all(hs) do
-	spr(tick%2+3,h.x-4,h.y-4)
+	spr((flr(tick%8)/4)+13,h.x-4,h.y-4)
 end
 
 --safe zone
@@ -262,23 +297,29 @@ end
 --player
 --circfill(p.x,p.y,p.r,14) 
 --line(p.x,p.y,p.x+cos(p.a)*6,p.y+sin(p.a)*6)
-local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
-local prow=.075
-local len=6
-local aft=len-2
-if btn(🅾️) then
-line(m.x-cos(p.a-prow)*aft,
-					m.y-sin(p.a-prow)*aft,
-					m.x-cos(p.a)*(aft+1),
-					m.y-sin(p.a)*(aft+1),12)
-line(m.x-cos(p.a+prow)*aft,
-					m.y-sin(p.a+prow)*aft,
-					m.x-cos(p.a)*(aft+1),
-					m.y-sin(p.a)*(aft+1),12)
-end
-line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
-line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
+if p.enabled then
+	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
+	local prow=.075
+	local len=6
+	local aft=len-2
+	if btn(🅾️) then
+	line(m.x-cos(p.a-prow)*aft,
+						m.y-sin(p.a-prow)*aft,
+						m.x-cos(p.a)*(aft+1),
+						m.y-sin(p.a)*(aft+1),12)
+	line(m.x-cos(p.a+prow)*aft,
+						m.y-sin(p.a+prow)*aft,
+						m.x-cos(p.a)*(aft+1),
+						m.y-sin(p.a)*(aft+1),12)
+	end
+	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
+	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
 --circfill(m.x-cos(p.a)*2,m.y-sin(p.a)*2,1,7)
+else 
+	for p2 in all(ps) do
+		line(p2.x1,p2.y1,p2.x2,p2.y2,7)
+	end
+end
 
 -- roids
 for v in all(rs) do
@@ -302,6 +343,11 @@ if b.enabled then
 	line(b.x,b.y,b.x+dx*2,b.y+dy*2,12)
 end
 
+if w.enabled then
+	circfill(64,64,w.r,0)
+	circ(64,64,w.r,6)
+end
+
 --hop countdown
 local f=12
 --local rekt={x=105,y=}
@@ -312,8 +358,18 @@ if pct>1 then pct=1 end
 rectfill(105,3,105+(126-105)*pct,9,f)
 print("tele",106,4,7)
 
+print("sector "..lvl,0,0,1)
+
+--score
+--for k,v in pairs(passes) do
+--	local sprite=11
+--	if v then sprite=10	end
+--	spr(sprite,scoreboxes[k][1],scoreboxes[k][2])
+--end
+
+
 print(log)
-print(lvl,0,0,10)
+--print(lvl,0,0,10)
 
 --if gameover then
 ----	local l=print("gameover",-10,0)
@@ -340,16 +396,19 @@ end
 --levels
 lvls={}
 lvls[1]=function() 
-	for i=1,4 do spawnroid() end
+--	for i=1,4 do spawnroid() end
+	spawnroid()
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[2]=function()
-	for i=1,7 do spawnroid() end
+--	for i=1,7 do spawnroid() end
+	spawnroid()
 	spawnzone()
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[3]=function()
-	for i=1,4 do spawnroid() end
+--	for i=1,4 do spawnroid() end
+	spawnroid()
 	add(lz,{a=.5,x=0,y=0,speed=.005})
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
@@ -404,17 +463,109 @@ end
 		y=64+sin(a)*d,
 		r=3+rnd(8-3),
 		dx=dx,
-		dy=dy
+		dy=dy,
+		enabled=false
 --			dx=rnd(2)-1,
 --			dy=rnd(2)-1
 	})
+	sfx(1)
 end
+-->8
+--modes
+function startlvl()
+
+end
+
+function nextlvl(start)
+	w.enabled=true
+	printh(start)
+	local t=0
+	while t<=1 do
+		t=(tick-start)/30
+		w.r=inner.r+(outer.r-inner.r)*t
+		printh("t is"..t)
+		yield()
+	end
+	w.enabled=false
+	lvl+=1
+	lz={}
+	zs={}
+	hs={}
+	p.x=64 p.y=30
+	if lvls[lvl] then lvls[lvl]() end
+	add(passes,true)
+	transitioning=false
+	return
+end
+
+lvls2={}
+lvls2[1]=function() 
+	local tickcount=0
+	local roids=0
+	while roids<4 do
+		if tickcount<=0 then
+			spawnroid()
+			tickcount=30
+			roids+=1
+		end
+		tickcount-=1
+		yield()
+	end
+	while tickcount>0 do tickcount-=1 yield() end
+	add(lz,{a=0,x=0,y=0,speed=.005})
+	for r in all(rs) do r.enabled=true end
+	p.controllable=true
+	return
+end
+lvls2[2]=function() 
+	local tickcount=0
+	local roids=0
+	while roids<7 do
+		if tickcount<=0 then
+			spawnroid()
+			tickcount=30
+			roids+=1
+		end
+		tickcount-=1
+		yield()
+	end
+	add(lz,{a=0,x=0,y=0,speed=.005})
+	for r in all(rs) do r.enabled=true end
+	p.controllable=true
+	return
+end
+
 __gfx__
-00000000006dd6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000006666660000000000e0000e00e0000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0070070066dddd660000000000eeee0000eeee000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000d6d88d6d0008000000e00e0000e88e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000d6d88d6d0080800000e00e0000e88e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0070070066dddd660008000000eeee0000eeee000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000006666660000000000e0000e00e0000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000006dd6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000006dd600000000000000000000000000002002000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
+0000000006666660000000000e0000e00e0000e0020220200202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
+0070070066dddd660000000000eeee0000eeee0020222202202222020200002002022020020220206000bbb6600888066000000600eeeeee0eeeee0000000000
+00077000d6d88d6d0008000000e00e0000e88e0002200220022882200002200000200200002882006b0bb006608880066000000600e00ee0eee00e0000000000
+00077000d6d88d6d0080800000e00e0000e88e00022002200228822000022000002002000028820060bb000668800006600000060ee00e0000e00eee00000000
+0070070066dddd660008000000eeee0000eeee002022220220222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
+0000000006666660000000000e0000e00e0000e002022020020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
+00000000006dd600000000000000000000000000002002000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
+00e00000000e00000000e00000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00e00000000e00000000e00000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00eeeeee00eeee0000eeee00eeeeee00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00e00e0000e00eeeeee00e0000e00e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00e00e00eee00e0000e00eee00e00e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+eeeeee0000eeee0000eeee0000eeeeee000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000e000000e000000e000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000e000000e000000e000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+05555500088888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+55050550880808800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+55050550888888800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+55555550880008800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+05555500088888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+05050500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+85800000555b00005550000066000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+58500000b5b000005550000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+858000005b5000005550000066000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000066000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__sfx__
+0005000005650096500e65013650176502165000000000001d6001e600216000000024600286002e6002f600000000000000000000001c6001d6001e6001f600000001f600206000000020600206000000021600
+000400000725008250082500a2500c2500f250132501d250232502c250332503e2500020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
+0006000a0b6500b6500b6500b6500a6500a6500b6500b6500b6500d6500d6000d6000d6000d6000d6000d60000000000000000000000000000000000000000000000000000000000000000000000000000000000
