@@ -3,24 +3,30 @@ version 33
 __lua__
 -- lasers
 -- casey labrack
+-- todo:
+--  many bullets?
+--  bullet damage tweak?
+--  bigger bullet
+--  single spawn func (async)
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
 					friction=.92,hop=25,charge=0,fullcharge=90,
 					enabled=true,controllable=true,alive=true,
-					thrusting=false}
+					thrusting=false,dmg=3}
 ps= {} --player death particles
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
 as= {} --animations (coroutines)
+fs= {} --flowers
 b = {x=0,y=0,dx,dy,a=0,r=1,speed=5,enabled=false}
 w = {enabled=false,start=0,duration=100,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
 maxrspeed=2
 minrspeed=.5
-lvl=5
+lvl=7
 lives=3
 passes={}
 log = ""
@@ -30,6 +36,7 @@ tick=0
 lvlswitchtick=90
 transitioning=false
 scoreboxes={{0,0},{7,0},{14,0},{21,0}}
+fmaxsizes={10,8,6,4}
 
 function _init()
 lvls[lvl]()
@@ -39,61 +46,6 @@ end
 
 function _update()
 tick+=1
-
--- do animations
-for a in all(as) do
-	if costatus(a)!="dead" then coresume(a)
-	else del(as,a) end
-end
-
--- laser move
-for l in all(lz) do
-	l.a-= l.speed
-	l.x = 64 + cos(l.a) * 63
-	l.y = 64 + sin(l.a) * 63
-end
-
--- safe zones
-for z in all(zs) do
-	if z.shrinking then
-		z.t-=z.speed
-		if z.t<2 then
-			z.a=rnd(1)
-			z.x=64+cos(z.a)*63
-			z.y=64+sin(z.a)*63
-			z.t=32
-			z.shrinking=false
-		end
-	end
-	if touching(p,z) then z.shrinking=true end
-end
-
---homing bomb move
-for h in all(hs) do
-	if h.enabled then
-		local a=atan2(p.x-h.x,p.y-h.y)
-		h.dx+=cos(a)*h.t
-		h.dy+=sin(a)*h.t
-		h.frametick+=1
-	else 
-		h.timer-=1
-		if h.timer<0 then h.enabled=true end
-		sfx(3)	
-	end
-	h.dx*=.97
-	h.dy*=.97
-	h.x+=h.dx
-	h.y+=h.dy
-	local a2=atan2(h.x-64,h.y-64)
-	if dist(h.x,h.y,64,64)<8 then
-		h.x=inner.x+cos(a2)*8
-		h.y=inner.y+sin(a2)*8
-	end
-	if dist(h.x,h.y,64,64)>63 then
-		h.x=64+cos(a2)*63
-		h.y=64+sin(a2)*63	
-	end
-end
 
 --	player move
 p.charge+=1
@@ -128,6 +80,92 @@ p.y=p.y+p.dy
 p.dx*=p.friction
 p.dy*=p.friction
 
+for f in all(fs) do
+	f.tick+=1
+	for l in all(f) do --each leaf
+		if (l.r>=2 and touching(p,l)) died()
+		if f.tick%30==0 then --grow
+			if not touching(l,inner) then
+				local g=l.p
+				while g~=nil do
+					if not g.alive then l.alive=false end
+					g=g.p
+				end
+				if l.r<fmaxsizes[l.g] and l.alive then
+					l.r+=1
+				end
+			end
+		end	
+	end
+	if f.tick%150==0 and #f<f.max then --bud
+		local couldbuds=filter(function(x) return x.alive and x.r>=fmaxsizes[x.g] and x.g<#fmaxsizes end, f)
+		if #couldbuds>0 then
+			local l=rnd(couldbuds)
+			local k={}
+			local ang=rnd(1)
+			if l.p~=nil then
+				ang=atan2(l.x-l.p.x,l.y-l.p.y)
+				ang+=-.25+rnd(.50)
+			end
+			k.x=l.x+cos(ang)*l.r	k.y=l.y+sin(ang)*l.r
+			k.r=2
+			k.g=l.g+1 k.p=l k.alive=true
+			add(l.children,k)
+			add(f,k)
+		end		
+	end
+end
+
+-- do animations
+for a in all(as) do
+	if costatus(a)!="dead" then coresume(a)
+	else del(as,a) end
+end
+
+-- laser move
+for l in all(lz) do
+	l.a-= l.speed
+	l.x = 64 + cos(l.a) * 63
+	l.y = 64 + sin(l.a) * 63
+end
+
+-- safe zones
+for z in all(zs) do
+	if z.shrinking then
+		z.t-=z.speed
+		if z.t<2 then
+			z.a=rnd(1) z.t=32
+			z.x=64+cos(z.a)*63 z.y=64+sin(z.a)*63
+			z.shrinking=false
+		end
+	end
+	if touching(p,z) then z.shrinking=true end
+end
+
+--homing bomb move
+for h in all(hs) do
+	if h.enabled then
+		local a=atan2(p.x-h.x,p.y-h.y)
+		h.dx+=cos(a)*h.t	 h.dy+=sin(a)*h.t
+		h.frametick+=1
+	else 
+		h.timer-=1
+		if h.timer<0 then h.enabled=true end
+		sfx(3)	
+	end
+	h.dx*=.97 h.dy*=.97
+	h.x+=h.dx	h.y+=h.dy
+	local a2=atan2(h.x-64,h.y-64)
+	if dist(h.x,h.y,64,64)<8 then
+		h.x=inner.x+cos(a2)*8
+		h.y=inner.y+sin(a2)*8
+	end
+	if dist(h.x,h.y,64,64)>63 then
+		h.x=64+cos(a2)*63
+		h.y=64+sin(a2)*63	
+	end
+end
+
 local ang=atan2(p.x-64,p.y-64)
 
 -- player vs outside wall
@@ -144,19 +182,12 @@ end
 
 -- player vs. obstacles
 for v in all(rs) do
-	if touching(p,v) then
-		gameover=true
-		_update=function() end
-	end
+	if (touching(p,v)) died()
 end
 
 --player vs. homing bombs
 for h in all(hs) do
-	if touching(p,h) then
---		died()
-		gameover=true
-		_update=function() end
-	end
+	if (touching(p,h)) died()
 end
 
 --laser/player collision
@@ -171,8 +202,7 @@ if p.enabled then
 			if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
 				p.enabled=false
 				add(ps,{x1=p.x,y1=p.y,x2=p.x+3,y2=p.y+3})
-					gameover=true
-					_update=function() end
+				died()
 			end
 		end
 	end
@@ -215,6 +245,21 @@ if b.enabled then
 	for i=1,10 do
 		b.x=x1+b.dx*i/10
 		b.y=y1+b.dy*i/10
+		for f in all(fs) do --flowers
+			for l in all(f) do --leaves
+				if l.alive and touching(b,l) then
+					b.enabled=false
+					l.r-=1
+					if l.r<3 then
+						printh(#f) 
+						del(l,f)
+						printh(#f) 
+--							l.alive=false l.r=0
+					end
+					goto donebullet
+				end
+			end
+		end
 		for v in all(rs) do --roids
 			if touching(b,v) then
 				b.enabled=false
@@ -228,8 +273,7 @@ if b.enabled then
 				b.enabled=false
 				h.enabled=false
 				h.timer=60
-				h.dx+=b.dx/4 
-				h.dy+=b.dy/4
+				h.dx+=b.dx/4	h.dy+=b.dy/4
 				goto donebullet
 			end
 		end
@@ -245,11 +289,18 @@ if b.enabled then
 end
 ::donebullet::
 
+for f in all(fs) do
+	local anyalive=false
+	for l in all(f) do
+		if l.alive then anyalive=true break end
+	end
+	if not anyalive then f.active=false end
+end
+
 --level win
-if #rs==0 and not transitioning then
+if #rs==0 and #fs==0 and not transitioning then
 --	nxtlvl()	
 	p.x=64 p.y=30
-
 	lz={}
 	zs={}
 	hs={}
@@ -280,8 +331,10 @@ function clearlvl()
 end
 
 function died()
-	clearlvl()
-	loadlvl()
+	sfx(2,-2)
+	_update=function() end
+--	clearlvl()
+--	loadlvl()
 end
 
 function beatlvl()
@@ -296,8 +349,32 @@ end
 
 function _draw()
 cls()
-
 circ(64,64,63,6) -- outer
+
+--flowers
+for f in all(fs) do
+	for l in all(f) do
+		if l.r>=2 then
+--			circ(l.x,l.y,l.r+1,8)
+		end
+	end
+	for l in all(f) do
+		if l.r>=2 then
+			fillp(ˇ)
+	--			ˇ∧
+			circfill(l.x,l.y,l.r,11)
+			fillp()
+--			circ(l.x,l.y,l.r,14)
+		end
+	end
+	for l in all(f) do
+		if l.r>=2 then
+			spr(20,l.x-4,l.y-4)
+		end
+	end
+	
+--	if (f[1].alive) spr(20,f[1].x-4,f[1].y-4)
+end
 
 --emitter
 circ(64,64,inner.r,6)
@@ -308,7 +385,7 @@ if #lz==0 then circ(64,64,1,2) end
 for h in all(hs) do
 	if not h.enabled then pal(8,2) end
 	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
-	pal()
+--	pal()
 end
 
 --safe zone
@@ -342,22 +419,20 @@ for l in all(lz) do
 end
 
 --player
---circfill(p.x,p.y,p.r,14) 
---line(p.x,p.y,p.x+cos(p.a)*6,p.y+sin(p.a)*6)
 if p.enabled then
 	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
 	local prow=.075
 	local len=6
 	local aft=len-2
-	if btn(🅾️) then
-	line(m.x-cos(p.a-prow)*aft,
-						m.y-sin(p.a-prow)*aft,
-						m.x-cos(p.a)*(aft+1),
-						m.y-sin(p.a)*(aft+1),12)
-	line(m.x-cos(p.a+prow)*aft,
-						m.y-sin(p.a+prow)*aft,
-						m.x-cos(p.a)*(aft+1),
-						m.y-sin(p.a)*(aft+1),12)
+	if p.thrusting then
+		line(m.x-cos(p.a-prow)*aft,
+							m.y-sin(p.a-prow)*aft,
+							m.x-cos(p.a)*(aft+1),
+							m.y-sin(p.a)*(aft+1),12)
+		line(m.x-cos(p.a+prow)*aft,
+							m.y-sin(p.a+prow)*aft,
+							m.x-cos(p.a)*(aft+1),
+							m.y-sin(p.a)*(aft+1),12)
 	end
 	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
 	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
@@ -405,7 +480,8 @@ if pct>1 then pct=1 end
 rectfill(105,3,105+(126-105)*pct,9,f)
 print("tele",106,4,7)
 
-print("sector "..lvl,0,0,1)
+--print("sector "..lvl,0,0,1)
+print(stat(1),0,0)
 
 --score
 --for k,v in pairs(passes) do
@@ -426,41 +502,26 @@ print(log)
 end
 
 -->8
---utils
-
-function dist(x1,y1,x2,y2)
-	return sqrt((x1-x2) * (x1-x2)+(y1-y2)*(y1-y2))
-end
-
-function distt(t1,t2)
-	return sqrt((t1.x-t2.x) * (t1.x-t2.x)+(t1.y-t2.y)*(t1.y-t2.y))
-end
-
-function touching(a,b)
-	return distt(a,b)<a.r+b.r
-end
--->8
 --levels
 lvls={}
 lvls[1]=function() 
---	for i=1,4 do spawnroid() end
-	spawnroid()
+	for i=1,4 do spawnroid() end
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[2]=function()
---	for i=1,7 do spawnroid() end
-	spawnroid()
-	spawnzone()
+	for i=1,7 do spawnroid() end
+	safezone()
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[3]=function()
---	for i=1,4 do spawnroid() end
-	spawnroid()
+	for i=1,4 do spawnroid() end
 	add(lz,{a=.5,x=0,y=0,speed=.005})
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[4]=function()
-	for i=1,4 do spawnroid() end
+	for i=1,7 do spawnroid() end
+	safezone()
+	add(lz,{a=.5,x=0,y=0,speed=.005})
 	add(lz,{a=0,x=0,y=0,speed=.005})
 end
 lvls[5]=function()
@@ -471,11 +532,33 @@ end
 lvls[6]=function()
 	spawnbomb()
 	for i=1,7 do spawnroid() end
+	safezone()
 	add(hs,h)
 	add(lz,{a=.5,x=0,y=0,speed=.005})
 end
+lvls[7]=function()
+--	spawnroid()
+--	rs[1].dx=0 rs[1].dy=0
+--	for i=1,4 do spawnroid() end
+	local f={}
+	f.tick=tick f.max=12 f.active=true
+	local fr={}
+	fr.x=64 fr.y=80 fr.r=4 fr.g=1 fr.p=nil fr.alive=true 
+	fr.lastspawned=0 fr.children={}
+	add(f,fr)
+	add(fs,f)
+	
+--	local f2={}
+--	f2.tick=tick f2.max=12 f2.active=true
+--	local fr2={}
+--	fr2.x=64 fr2.y=40 fr2.r=4 fr2.g=1 fr2.p=nil fr2.alive=true 
+--	fr2.lastspawned=0 fr2.children={}
+--	add(f2,fr2)
+--	add(fs,f2)
+	
+end
 
-function spawnzone()
+function safezone()
 	local z = {a=0,r=32,x=0,y=0,t=32,shrinking=false,speed=.25}
 	z.a=rnd(1)
 	z.x=64+cos(z.a)*63
@@ -523,6 +606,35 @@ end
 --			dy=rnd(2)-1
 	})
 --	sfx(1)
+end
+-->8
+--utils
+
+function dist(x1,y1,x2,y2)
+	return sqrt((x1-x2) * (x1-x2)+(y1-y2)*(y1-y2))
+end
+
+function distt(t1,t2)
+	return sqrt((t1.x-t2.x) * (t1.x-t2.x)+(t1.y-t2.y)*(t1.y-t2.y))
+end
+
+function touching(a,b)
+	return distt(a,b)<a.r+b.r
+end
+
+function filter(f,t)
+	local r={}
+	for _,v in ipairs(t) do
+		if f(v) then add(r,v) end
+	end
+	return r
+end
+
+function allt(f,t)
+	for _,v in ipairs(t) do
+		if (f(v)==false) return false
+	end
+	return true
 end
 -->8
 --modes
@@ -598,14 +710,14 @@ __gfx__
 0070070066dddd660008000000eeee0000eeee002022220220222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
 0000000006666660000000000e0000e00e0000e002022020020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
-00f00000000f00000000f00000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f00000000f00000000f00000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00ffffff00ffff0000ffff00ffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f0000f88ffffff88f0000f88f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f00fff88f0000f88fff00f88f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-ffffff0000ffff0000ffff0000ffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000f000000f000000f000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000f000000f000000f000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f00000000f00000000f00000000f000008000000eee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f00000000f00000000f00000000f00008080000e00eee000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00ffffff00ffff0000ffff00ffffff0008eee800e00000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f88f0000f88ffffff88f0000f88f0080e8e080e000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f88f00fff88f0000f88fff00f88f0008eee800e00000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000
+ffffff0000ffff0000ffff0000ffffff008080000e000ee000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000f000000f000000f000000f00000000800000ee0ee0000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000f000000f000000f000000f0000000000000000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 05555500088888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 55050550880808800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -624,3 +736,4 @@ __sfx__
 000400000725008250082500a2500c2500f250132501d250232502c250332503e2500020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
 0006000a0b6200b6200b6200b6200a6200a6200b6200b6200b6200d6200d6000d6000d6000d6000d6000d60000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000e000702770027700477004770027700b7700b7700f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
+011400000030000300003000030000300003000030000300003000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
