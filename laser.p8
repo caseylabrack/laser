@@ -8,26 +8,27 @@ __lua__
 --  bullet damage tweak?
 --  bigger bullet
 --  single spawn func (async)
+--  lives,level restarts
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
 					friction=.92,hop=25,charge=0,fullcharge=90,
 					enabled=true,controllable=true,alive=true,
-					thrusting=false,dmg=3}
+					thrusting=false}
 ps= {} --player death particles
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
 as= {} --animations (coroutines)
 fs= {} --flowers
-b = {x=0,y=0,dx,dy,a=0,r=1,speed=5,enabled=false}
+b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
 w = {enabled=false,start=0,duration=100,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
 maxrspeed=2
 minrspeed=.5
-lvl=7
-lives=3
+lvl=9
+lives=8
 passes={}
 log = ""
 isgameover=false
@@ -80,38 +81,47 @@ p.y=p.y+p.dy
 p.dx*=p.friction
 p.dy*=p.friction
 
+--flowers
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
-		if (l.r>=2 and touching(p,l)) died()
-		if f.tick%30==0 then --grow
+		if touching(p,l) then died() end
+		l.growcount+=1
+		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
-				local g=l.p
-				while g~=nil do
-					if not g.alive then l.alive=false end
-					g=g.p
-				end
-				if l.r<fmaxsizes[l.g] and l.alive then
-					l.r+=1
-				end
+				l.r+=1
+				l.growcount=0
 			end
 		end	
 	end
 	if f.tick%150==0 and #f<f.max then --bud
-		local couldbuds=filter(function(x) return x.alive and x.r>=fmaxsizes[x.g] and x.g<#fmaxsizes end, f)
+		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
-			local l=rnd(couldbuds)
 			local k={}
-			local ang=rnd(1)
-			if l.p~=nil then
-				ang=atan2(l.x-l.p.x,l.y-l.p.y)
-				ang+=-.25+rnd(.50)
+			local ang=0
+			local colliding=true
+			local i=0
+			local l={}
+			while colliding and i<100 do
+				i+=1
+				l=rnd(couldbuds)
+				ang=rnd(1)
+				k.x=l.x+cos(ang)*l.r	k.y=l.y+sin(ang)*l.r
+				k.r=8	
+				colliding=false
+				for m in all(f) do
+					if m~=l then
+						if touching(m,k) then
+							colliding=true
+							break
+						end
+					end
+				end
 			end
-			k.x=l.x+cos(ang)*l.r	k.y=l.y+sin(ang)*l.r
-			k.r=2
-			k.g=l.g+1 k.p=l k.alive=true
-			add(l.children,k)
-			add(f,k)
+			if i<100 then
+				k.r=2	k.growcount=0
+				add(f,k)
+			end
 		end		
 	end
 end
@@ -242,19 +252,18 @@ end
 if b.enabled then
 	local x1=b.x 
 	local y1=b.y
-	for i=1,10 do
-		b.x=x1+b.dx*i/10
-		b.y=y1+b.dy*i/10
+	for i=1,5 do
+		b.x=x1+b.dx*i/5
+		b.y=y1+b.dy*i/5
 		for f in all(fs) do --flowers
 			for l in all(f) do --leaves
-				if l.alive and touching(b,l) then
+				if touching(b,l) then
 					b.enabled=false
-					l.r-=1
-					if l.r<3 then
-						printh(#f) 
-						del(l,f)
-						printh(#f) 
---							l.alive=false l.r=0
+					l.r-=2
+					l.growcount=0
+					if l.r<3 then	
+						del(f,l)
+						if #f==0 then del(fs,f) end 
 					end
 					goto donebullet
 				end
@@ -263,7 +272,7 @@ if b.enabled then
 		for v in all(rs) do --roids
 			if touching(b,v) then
 				b.enabled=false
-				v.r-=1
+				v.r-=2
 				if v.r<2 then	del(rs,v) end
 				goto donebullet
 			end
@@ -277,25 +286,13 @@ if b.enabled then
 				goto donebullet
 			end
 		end
-		if touching(inner,b) then
-			b.enabled=false
-			goto donebullet
-		end
-		if not touching(outer,b) then
+		if touching(inner,b) or not touching(outer,b) then
 			b.enabled=false
 			goto donebullet
 		end
 	end
 end
 ::donebullet::
-
-for f in all(fs) do
-	local anyalive=false
-	for l in all(f) do
-		if l.alive then anyalive=true break end
-	end
-	if not anyalive then f.active=false end
-end
 
 --level win
 if #rs==0 and #fs==0 and not transitioning then
@@ -306,6 +303,7 @@ if #rs==0 and #fs==0 and not transitioning then
 	hs={}
 	add(passes,true)
 	lvl+=1
+	if lvl>#lvls then lvl=1 end
 	lvls[lvl]()
 end
 end
@@ -351,29 +349,26 @@ function _draw()
 cls()
 circ(64,64,63,6) -- outer
 
+--safe zone
+for z in all(zs) do
+	fillp(░)
+	circfill(z.x,z.y,z.r,0x01)
+--	circfill(z.x,z.y,z.r,0x0c)
+	fillp()
+	circfill(z.x,z.y,z.r-z.t,0)
+	circ(z.x,z.y,z.r,1)
+end
+
 --flowers
 for f in all(fs) do
 	for l in all(f) do
-		if l.r>=2 then
---			circ(l.x,l.y,l.r+1,8)
-		end
-	end
-	for l in all(f) do
-		if l.r>=2 then
 			fillp(ˇ)
-	--			ˇ∧
 			circfill(l.x,l.y,l.r,11)
 			fillp()
---			circ(l.x,l.y,l.r,14)
-		end
 	end
 	for l in all(f) do
-		if l.r>=2 then
 			spr(20,l.x-4,l.y-4)
-		end
 	end
-	
---	if (f[1].alive) spr(20,f[1].x-4,f[1].y-4)
 end
 
 --emitter
@@ -386,16 +381,6 @@ for h in all(hs) do
 	if not h.enabled then pal(8,2) end
 	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
 --	pal()
-end
-
---safe zone
-for z in all(zs) do
-	fillp(░)
-	circfill(z.x,z.y,z.r,0x01)
---	circfill(z.x,z.y,z.r,0x0c)
-	fillp()
-	circfill(z.x,z.y,z.r-z.t,0)
-	circ(z.x,z.y,z.r,1)
 end
 
 --laser
@@ -459,10 +444,11 @@ end
 
 --bullet
 if b.enabled then
-	local dx=cos(b.a+5)
-	local dy=sin(b.a+5)
-	line(b.x+dx*2,b.y+dy*2,b.x+dx*4,b.y+dy*4,1)
-	line(b.x,b.y,b.x+dx*2,b.y+dy*2,12)
+	circ(b.x,b.y,1,12)
+--	local dx=cos(b.a+5)
+--	local dy=sin(b.a+5)
+--	line(b.x+dx*2,b.y+dy*2,b.x+dx*4,b.y+dy*4,1)
+--	line(b.x,b.y,b.x+dx*2,b.y+dy*2,12)
 end
 
 if w.enabled then
@@ -539,23 +525,42 @@ end
 lvls[7]=function()
 --	spawnroid()
 --	rs[1].dx=0 rs[1].dy=0
---	for i=1,4 do spawnroid() end
+	for i=1,4 do spawnroid() end
+	local root=spawnflower()
+	root.y=30
+end
+lvls[8]=function()
+	for i=1,4 do spawnroid() end
+	local root=spawnflower()
+	root.y=30
+	root=spawnflower()
+	root.y=90
+	add(lz,{a=.5,x=0,y=0,speed=.005})
+end
+lvls[9]=function()
+	spawnbomb()
+	for i=1,4 do spawnroid() end
+	local root=spawnflower()
+	root.y=30
+	root=spawnflower()
+	root.y=90
+	add(lz,{a=.5,x=0,y=0,speed=.005})
+end
+
+
+
+function spawnflower()
 	local f={}
-	f.tick=tick f.max=12 f.active=true
+	f.tick=tick+flr(rnd(10)) 
+	f.max=12 
+	f.growgoal=30 --grow rate 
+	f.br=150 --bud rate
 	local fr={}
-	fr.x=64 fr.y=80 fr.r=4 fr.g=1 fr.p=nil fr.alive=true 
-	fr.lastspawned=0 fr.children={}
+	fr.x=64 fr.y=90 fr.r=4 
+	fr.growcount=0
 	add(f,fr)
 	add(fs,f)
-	
---	local f2={}
---	f2.tick=tick f2.max=12 f2.active=true
---	local fr2={}
---	fr2.x=64 fr2.y=40 fr2.r=4 fr2.g=1 fr2.p=nil fr2.alive=true 
---	fr2.lastspawned=0 fr2.children={}
---	add(f2,fr2)
---	add(fs,f2)
-	
+	return fr --calling code can modify defaults
 end
 
 function safezone()
