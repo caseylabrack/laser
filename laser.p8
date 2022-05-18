@@ -4,11 +4,9 @@ __lua__
 -- lasers
 -- casey labrack
 -- todo:
---  many bullets?
---  bullet damage tweak?
---  bigger bullet
 --  single spawn func (async)
 --  lives,level restarts
+--  mulligan?
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
@@ -27,7 +25,7 @@ inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
 maxrspeed=2
 minrspeed=.5
-lvl=9
+lvl=1
 lives=8
 passes={}
 log = ""
@@ -38,15 +36,46 @@ lvlswitchtick=90
 transitioning=false
 scoreboxes={{0,0},{7,0},{14,0},{21,0}}
 fmaxsizes={10,8,6,4}
+game={state="setup",countdown=30,unit=1}
+procession={[1]="roids",[2]="lasers",[3]="shileds"}
 
 function _init()
-lvls[lvl]()
+--lvls[lvl]()
+game.state="setup"
 --	local a=cocreate(lvls2[lvl])
 --	add(as,a)
 end
 
 function _update()
 tick+=1
+
+if game.state=="setup" then
+	game.countdown-=1
+	if game.countdown<=0 then
+		if game.unit==1 then --roids
+			spawnroid()
+			if #rs==lvls3[lvl].roids then game.unit+=1 end
+		elseif game.unit==2 then --laser
+		 add(lz,{a=0,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005})
+		 if #lz==lvls3[lvl].lasers then game.unit+=1 end
+		elseif game.unit==3 then --safezone
+			if lvls3[lvl].shield then safezone() end
+			game.unit+=1 
+		elseif game.unit==4 then --bomb	
+			if lvls3[lvl].bomb then spawnbomb() end
+			game.unit+=1
+		elseif game.unit==5 then --flower
+			local root=spawnflower()
+			local a=1/#fs
+			root.x=64+cos(a)*20	root.y=64+sin(a)*20
+			if #fs==lvls3[lvl].flowers then game.unit+=1 end
+		else -- done
+			game.state="running"
+		end
+		game.countdown=30
+	end
+	return
+end
 
 --	player move
 p.charge+=1
@@ -623,10 +652,12 @@ function distt(t1,t2)
 	return sqrt((t1.x-t2.x) * (t1.x-t2.x)+(t1.y-t2.y)*(t1.y-t2.y))
 end
 
+--circle/circle intersection
 function touching(a,b)
 	return distt(a,b)<a.r+b.r
 end
 
+--what array elements satisfy predicate function
 function filter(f,t)
 	local r={}
 	for _,v in ipairs(t) do
@@ -635,9 +666,10 @@ function filter(f,t)
 	return r
 end
 
+--do all array elements satisfy predicate function
 function allt(f,t)
 	for _,v in ipairs(t) do
-		if (f(v)==false) return false
+		if not f(v) then return false end
 	end
 	return true
 end
@@ -668,6 +700,9 @@ function nextlvl(start)
 	transitioning=false
 	return
 end
+
+lvls3={}
+lvls3[1]={roids=4,lasers=1,flowers=3,shield=true,bomb=true}
 
 lvls2={}
 lvls2[1]=function() 
@@ -741,4 +776,5 @@ __sfx__
 000400000725008250082500a2500c2500f250132501d250232502c250332503e2500020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
 0006000a0b6200b6200b6200b6200a6200a6200b6200b6200b6200d6200d6000d6000d6000d6000d6000d60000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000e000702770027700477004770027700b7700b7700f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
-011400000030000300003000030000300003000030000300003000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001400000a0500b0500c0500c0500c0500f0500f0500f050110501105013050130501605016050160501805018050180501b0501b0501b0500000000000000000000000000000000000000000000000000000000
+00100000240502405024050220502b0502e0502e0502e0502e0502e0502e0502b0502e05033050350502705024050220501f0501d0501b0501b0501d0501f0500000000000000000000000000000000000000000
