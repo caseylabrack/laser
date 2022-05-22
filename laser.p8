@@ -7,11 +7,14 @@ __lua__
 --  single spawn func (async)
 --  lives,level restarts
 --  mulligan?
+--  bg
+--  nicer shield effect
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
-					friction=.92,hop=25,charge=0,fullcharge=90,
-					enabled=true,controllable=true,alive=true,
+					friction=.92,
+					hop=25,charge=0,fullcharge=90,
+					enabled=true,controllable=true,
 					thrusting=false}
 ps= {} --player death particles
 lz= {} --lasers
@@ -19,67 +22,48 @@ zs= {} --safe zones
 hs= {} --homing bombs
 as= {} --animations (coroutines)
 fs= {} --flowers
+rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
 w = {enabled=false,start=0,duration=100,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
-maxrspeed=2
-minrspeed=.5
 lvl=1
-lives=8
-passes={}
-log = ""
-isgameover=false
-rs={}
+extralives=3
 tick=0
-lvlswitchtick=90
-transitioning=false
 scoreboxes={{0,0},{7,0},{14,0},{21,0}}
 fmaxsizes={10,8,6,4}
-game={state="setup",countdown=30,unit=1}
-procession={[1]="roids",[2]="lasers",[3]="shileds"}
+state="setup"
 
 function _init()
---lvls[lvl]()
-game.state="setup"
---	local a=cocreate(lvls2[lvl])
---	add(as,a)
+intro=cocreate(spawn)
+coresume(intro,lvls[lvl])
 end
 
 function _update()
 tick+=1
 
-if game.state=="setup" then
-	game.countdown-=1
-	if game.countdown<=0 then
-		if game.unit==1 then --roids
-			spawnroid()
-			if #rs==lvls3[lvl].roids then game.unit+=1 end
-		elseif game.unit==2 then --laser
-		 add(lz,{a=0,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005})
-		 if #lz==lvls3[lvl].lasers then game.unit+=1 end
-		elseif game.unit==3 then --safezone
-			if lvls3[lvl].shield then safezone() end
-			game.unit+=1 
-		elseif game.unit==4 then --bomb	
-			if lvls3[lvl].bomb then spawnbomb() end
-			game.unit+=1
-		elseif game.unit==5 then --flower
-			local root=spawnflower()
-			local a=1/#fs
-			root.x=64+cos(a)*20	root.y=64+sin(a)*20
-			if #fs==lvls3[lvl].flowers then game.unit+=1 end
-		else -- done
-			game.state="running"
-		end
-		game.countdown=30
+if state=="waiting" then
+	if costatus(waiting)~="dead" then
+		coresume(waiting)
+--		return
+	else
+		state="setup"
+		intro=cocreate(spawn)
+		coresume(intro,lvls[lvl])
 	end
-	return
 end
 
---	player move
+if state=="setup" then
+	if costatus(intro)~="dead" then
+		coresume(intro)
+		return
+	else
+		state="running"
+	end
+end
+
 p.charge+=1
-if p.controllable and p.alive then
+if p.enabled then
 	if btn(➡️) then p.a=p.a-p.rt end
 	if btn(⬅️) then p.a=p.a+p.rt end
 	if btn(⬆️) and p.charge>p.fullcharge then 
@@ -114,7 +98,7 @@ p.dy*=p.friction
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
-		if touching(p,l) then died() end
+		if p.enabled and touching(p,l) then died() end
 		l.growcount+=1
 		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
@@ -219,14 +203,16 @@ if touching(inner,p) then
 	p.y=64+sin(ang)*8
 end
 
--- player vs. obstacles
-for v in all(rs) do
-	if (touching(p,v)) died()
-end
-
---player vs. homing bombs
-for h in all(hs) do
-	if (touching(p,h)) died()
+if p.enabled then
+	-- player vs. obstacles
+	for v in all(rs) do
+		if (touching(p,v)) died()
+	end
+	
+	--player vs. homing bombs
+	for h in all(hs) do
+		if (touching(p,h)) died()
+	end
 end
 
 --laser/player collision
@@ -324,54 +310,27 @@ end
 ::donebullet::
 
 --level win
-if #rs==0 and #fs==0 and not transitioning then
---	nxtlvl()	
-	p.x=64 p.y=30
+if #rs==0 and #fs==0 and p.enabled then
 	lz={}
 	zs={}
 	hs={}
-	add(passes,true)
 	lvl+=1
+	extralives=3
 	if lvl>#lvls then lvl=1 end
-	lvls[lvl]()
+	state="setup"
+	intro=cocreate(spawn)
+	coresume(intro,lvls[lvl])
 end
-end
-
-function nxtlvl()
-	transitioning=true
-	lz={}
-	zs={}
-	hs={}
-	add(passes,true)
-	p.controllable=false
-	lvl+=1
-	local a=cocreate(lvls2[lvl])
-	add(as,a)
-end
-
-function clearlvl()
-	p.x=64 p.y=30
-	lz={}
-	zs={}
-	hs={}
-	rs={}
 end
 
 function died()
 	sfx(2,-2)
-	_update=function() end
---	clearlvl()
---	loadlvl()
-end
-
-function beatlvl()
-	clearlvl()
-	lvl+=1
-	loadlvl()
-end
-
-function loadlvl()
-
+	extralives-=1
+	if extralives<0 then lvl=1 end
+	p.enabled=false
+	state="waiting"
+	waiting=cocreate(anykey)
+	coresume(waiting,60)
 end
 
 function _draw()
@@ -409,7 +368,7 @@ if #lz==0 then circ(64,64,1,2) end
 for h in all(hs) do
 	if not h.enabled then pal(8,2) end
 	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
---	pal()
+	pal()
 end
 
 --laser
@@ -474,10 +433,6 @@ end
 --bullet
 if b.enabled then
 	circ(b.x,b.y,1,12)
---	local dx=cos(b.a+5)
---	local dy=sin(b.a+5)
---	line(b.x+dx*2,b.y+dy*2,b.x+dx*4,b.y+dy*4,1)
---	line(b.x,b.y,b.x+dx*2,b.y+dy*2,12)
 end
 
 if w.enabled then
@@ -486,17 +441,23 @@ if w.enabled then
 end
 
 --hop countdown
-local f=12
---local rekt={x=105,y=}
-if (p.charge<p.fullcharge) f=1
+--local f=12
+--if (p.charge<p.fullcharge) f=1
+local f=p.charge<p.fullcharge and 1 or 12
 rect(105,3,126,9,f)
 local pct=p.charge/p.fullcharge
 if pct>1 then pct=1 end
 rectfill(105,3,105+(126-105)*pct,9,f)
 print("tele",106,4,7)
 
---print("sector "..lvl,0,0,1)
-print(stat(1),0,0)
+print("sector "..lvl,0,0,7)
+for i=1,extralives do
+	spr(22,i*6-6,10)
+end
+--if extralives==1 then
+--	spr(22,0,10)
+--end
+--print(stat(1),0,0)
 
 --score
 --for k,v in pairs(passes) do
@@ -506,7 +467,7 @@ print(stat(1),0,0)
 --end
 
 
-print(log)
+--print(log)
 --print(lvl,0,0,10)
 
 --if gameover then
@@ -518,136 +479,111 @@ end
 
 -->8
 --levels
-lvls={}
-lvls[1]=function() 
-	for i=1,4 do spawnroid() end
-	add(lz,{a=0,x=0,y=0,speed=.005})
-end
-lvls[2]=function()
-	for i=1,7 do spawnroid() end
-	safezone()
-	add(lz,{a=0,x=0,y=0,speed=.005})
-end
-lvls[3]=function()
-	for i=1,4 do spawnroid() end
-	add(lz,{a=.5,x=0,y=0,speed=.005})
-	add(lz,{a=0,x=0,y=0,speed=.005})
-end
-lvls[4]=function()
-	for i=1,7 do spawnroid() end
-	safezone()
-	add(lz,{a=.5,x=0,y=0,speed=.005})
-	add(lz,{a=0,x=0,y=0,speed=.005})
-end
-lvls[5]=function()
-	spawnbomb()
-	for i=1,4 do spawnroid() end
-	add(lz,{a=.5,x=0,y=0,speed=.005})
-end
-lvls[6]=function()
-	spawnbomb()
-	for i=1,7 do spawnroid() end
-	safezone()
-	add(hs,h)
-	add(lz,{a=.5,x=0,y=0,speed=.005})
-end
-lvls[7]=function()
---	spawnroid()
---	rs[1].dx=0 rs[1].dy=0
-	for i=1,4 do spawnroid() end
-	local root=spawnflower()
-	root.y=30
-end
-lvls[8]=function()
-	for i=1,4 do spawnroid() end
-	local root=spawnflower()
-	root.y=30
-	root=spawnflower()
-	root.y=90
-	add(lz,{a=.5,x=0,y=0,speed=.005})
-end
-lvls[9]=function()
-	spawnbomb()
-	for i=1,4 do spawnroid() end
-	local root=spawnflower()
-	root.y=30
-	root=spawnflower()
-	root.y=90
-	add(lz,{a=.5,x=0,y=0,speed=.005})
+lvls={
+	{roids=4,lasers=1},
+	{roids=7,lasers=1,safezone=true},
+	{roids=6,lasers=1,flowers=3},
+	{roids=7,lasers=2,safezone=true},
+	{roids=6,bomb=true},
+	{roids=5,lasers=2},
+	{roids=6,flowers=3,bomb=true},
+}
+
+function spawn(level)
+	lz={}	zs={} hs={} rs={} fs={}
+	b.enabled=false
+	c=15 p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
+	while c>0 do c-=1 yield() end
+	p.enabled=true
+	for unit,num in pairs(level) do
+		c=15 --countdown spawn interval
+		while true do			
+			c-=1
+			if c>0 then goto continue end
+			if unit=="roids" then
+				local r={}
+				local a=aim_away(.25,.25)
+				local d=rnd(64-24)+12
+				r.x=64+cos(a)*d r.y=64+sin(a)*d
+				local to_p=atan2(p.x-r.x,p.y-r.y)								
+				local a2=aim_away(to_p,.25)
+				local spd=rnd(2)+.5
+				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
+				r.r=3+rnd(8-3) r.enabled=true
+				add(rs,r)
+				if #rs==num then break end
+			end
+			if unit=="safezone" then
+				local z = {a=0,r=32,x=0,y=0,t=32,shrinking=false,speed=.25}
+				z.a=rnd(1)
+				z.x=64+cos(z.a)*63
+				z.y=64+sin(z.a)*63
+				add(zs,z) 
+				break
+			end
+			if unit=="lasers" then
+				local a=(1/num)*#lz+.1
+				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005})
+				if #lz==num then break end
+			end
+			if unit=="bomb" then
+				local a=aim_away(.25,.6)
+				local d=rnd(64-24)+12
+				add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
+								r=3,dx=0,dy=0,t=.1,
+								enabled=true,timer=0,
+								frametick=0}) 
+				break
+			end
+			if unit=="flowers" then
+				local f={}
+				f.tick=flr(rnd(10)) 
+				f.max=12 
+				f.growgoal=30 --grow rate 
+				f.br=150 --bud rate
+				local r={}
+				local d=12+rnd(63-24)
+				local a=rnd()
+				if abs(a-.25)<.1 then a+=.1+rnd(.2) end
+				r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
+				r.growcount=0
+				add(f,r)
+				add(fs,f)
+				if #fs==num then break end
+			end
+			c=15
+			::continue::
+			yield()
+		end
+	end
+	c=15
+	while c>0 do c-=1 yield() end
 end
 
-
-
-function spawnflower()
-	local f={}
-	f.tick=tick+flr(rnd(10)) 
-	f.max=12 
-	f.growgoal=30 --grow rate 
-	f.br=150 --bud rate
-	local fr={}
-	fr.x=64 fr.y=90 fr.r=4 
-	fr.growcount=0
-	add(f,fr)
-	add(fs,f)
-	return fr --calling code can modify defaults
+function anykey(delay)
+	while delay>0 do
+		delay-=1
+		yield()
+	end
+	while btn()==0 do
+		yield()
+	end
 end
 
-function safezone()
-	local z = {a=0,r=32,x=0,y=0,t=32,shrinking=false,speed=.25}
-	z.a=rnd(1)
-	z.x=64+cos(z.a)*63
-	z.y=64+sin(z.a)*63
-	add(zs,z)
-end
-
-function spawnbomb()
-	add(hs,{x=80,y=64+rnd(64),
-	r=3,dx=0,dy=0,t=.1,
-	enabled=true,timer=0,
-	frametick=0}) 
-end
-
-function spawnroid()
-local a,d,x,y,dx,dy
-valid=false
-while valid==false do
-	a=rnd(1)
-	d=6+rnd(63-6)
-	x=64+cos(a)*d
-	y=64+sin(a)*d
-	
-	if dist(x,y,p.x,p.y)>40 then 
-		valid=true
-	end		
-end
-	
-	local atop=atan2(x-p.x,y-p.y)
---		local atop=atan2(p.x-x,p.y-y)
-	dx=cos(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
-	dy=sin(atop)*(rnd(maxrspeed-minrspeed)+minrspeed)
---		if atop-atan2(dx,dy)<.2 then
---			a+=.25+rnd(.5)
---		end
-	
-	add(rs,{
-		x=64+cos(a)*d,
-		y=64+sin(a)*d,
-		r=3+rnd(8-3),
-		dx=dx,
-		dy=dy,
-		enabled=true
---			dx=rnd(2)-1,
---			dy=rnd(2)-1
-	})
---	sfx(1)
+--get random angle that is not within margin of given angle
+function aim_away(ang,margin)
+	local margin=margin or .25
+	return rnd(1-margin)+ang+margin/2
 end
 -->8
 --utils
 
+--euclidean dist
 function dist(x1,y1,x2,y2)
 	return sqrt((x1-x2) * (x1-x2)+(y1-y2)*(y1-y2))
 end
 
+--euclidean dist two points
 function distt(t1,t2)
 	return sqrt((t1.x-t2.x) * (t1.x-t2.x)+(t1.y-t2.y)*(t1.y-t2.y))
 end
@@ -673,74 +609,6 @@ function allt(f,t)
 	end
 	return true
 end
--->8
---modes
-function startlvl()
-
-end
-
-function nextlvl(start)
-	w.enabled=true
-	printh(start)
-	local t=0
-	while t<=1 do
-		t=(tick-start)/30
-		w.r=inner.r+(outer.r-inner.r)*t
-		printh("t is"..t)
-		yield()
-	end
-	w.enabled=false
-	lvl+=1
-	lz={}
-	zs={}
-	hs={}
-	p.x=64 p.y=30
-	if lvls[lvl] then lvls[lvl]() end
-	add(passes,true)
-	transitioning=false
-	return
-end
-
-lvls3={}
-lvls3[1]={roids=4,lasers=1,flowers=3,shield=true,bomb=true}
-
-lvls2={}
-lvls2[1]=function() 
-	local tickcount=0
-	local roids=0
-	while roids<4 do
-		if tickcount<=0 then
-			spawnroid()
-			tickcount=30
-			roids+=1
-		end
-		tickcount-=1
-		yield()
-	end
-	while tickcount>0 do tickcount-=1 yield() end
-	add(lz,{a=0,x=0,y=0,speed=.005})
-	for r in all(rs) do r.enabled=true end
-	p.controllable=true
-	return
-end
-lvls2[2]=function() 
-	local tickcount=0
-	local roids=0
-	while roids<7 do
-		if tickcount<=0 then
-			spawnroid()
-			tickcount=30
-			roids+=1
-		end
-		tickcount-=1
-		yield()
-	end
-	add(lz,{a=0,x=0,y=0,speed=.005})
-	for r in all(rs) do r.enabled=true end
-	p.controllable=true
-	return
-end
-
 __gfx__
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
 0000000006666660000000000e0000e00e0000e0020220200202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
@@ -750,11 +618,11 @@ __gfx__
 0070070066dddd660008000000eeee0000eeee002022220220222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
 0000000006666660000000000e0000e00e0000e002022020020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
-00f00000000f00000000f00000000f000008000000eee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f00000000f00000000f00000000f00008080000e00eee000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00ffffff00ffff0000ffff00ffffff0008eee800e00000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f0000f88ffffff88f0000f88f0080e8e080e000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f00fff88f0000f88fff00f88f0008eee800e00000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f00000000f00000000f00000000f000008000000eee00000700000000000000000000000000000000000000000000000000000000000000000000000000000
+00f00000000f00000000f00000000f00008080000e00eee000700000000000000000000000000000000000000000000000000000000000000000000000000000
+00ffffff00ffff0000ffff00ffffff0008eee800e00000ee07770000000000000000000000000000000000000000000000000000000000000000000000000000
+00f88f0000f88ffffff88f0000f88f0080e8e080e000000e77077000000000000000000000000000000000000000000000000000000000000000000000000000
+00f88f00fff88f0000f88fff00f88f0008eee800e00000ee70007000000000000000000000000000000000000000000000000000000000000000000000000000
 ffffff0000ffff0000ffff0000ffffff008080000e000ee000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000f000000f000000f000000f00000000800000ee0ee0000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000f000000f000000f000000f0000000000000000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
