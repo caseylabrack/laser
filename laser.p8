@@ -4,17 +4,20 @@ __lua__
 -- lasers
 -- casey labrack
 -- todo:
---  single spawn func (async)
---  lives,level restarts
---  mulligan?
 --  bg
 --  nicer shield effect
+-- 	fix flowers spawn out of bounds
+-- 	starfield flyin
+--  timing or lap based enemy
+--  gun rdy
+--  multiple bullets?
+--  optimized bullets
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
 					friction=.92,
 					hop=25,charge=0,fullcharge=90,
-					enabled=true,controllable=true,
+					enabled=false,controllable=true,
 					thrusting=false}
 ps= {} --player death particles
 lz= {} --lasers
@@ -24,7 +27,7 @@ as= {} --animations (coroutines)
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
-w = {enabled=false,start=0,duration=100,r=0}
+w = {enabled=false,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
 lvl=1
@@ -62,8 +65,8 @@ if state=="setup" then
 	end
 end
 
-p.charge+=1
 if p.enabled then
+	p.charge+=1
 	if btn(➡️) then p.a=p.a-p.rt end
 	if btn(⬅️) then p.a=p.a+p.rt end
 	if btn(⬆️) and p.charge>p.fullcharge then 
@@ -87,6 +90,7 @@ if p.enabled then
 		b.enabled=true
 		b.x=p.x b.y=p.y b.a=p.a
 		b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
+		sfx(11)
 	end
 end
 p.x=p.x+p.dx
@@ -168,13 +172,13 @@ end
 --homing bomb move
 for h in all(hs) do
 	if h.enabled then
-		local a=atan2(p.x-h.x,p.y-h.y)
+		local a=atan2(p.x-h.x+rnd(4)-2,p.y-h.y+rnd(4)-2)
 		h.dx+=cos(a)*h.t	 h.dy+=sin(a)*h.t
 		h.frametick+=1
 	else 
 		h.timer-=1
 		if h.timer<0 then h.enabled=true end
-		sfx(3)	
+--		sfx(3)	
 	end
 	h.dx*=.97 h.dy*=.97
 	h.x+=h.dx	h.y+=h.dy
@@ -335,7 +339,7 @@ end
 
 function _draw()
 cls()
-circ(64,64,63,6) -- outer
+if not w.enabled then circ(64,64,63,6) end -- outer
 
 --safe zone
 for z in all(zs) do
@@ -454,6 +458,12 @@ print("sector "..lvl,0,0,7)
 for i=1,extralives do
 	spr(22,i*6-6,10)
 end
+
+if w.enabled then
+	circfill(64,64,w.r,0)
+	circ(64,64,w.r,6)
+end
+
 --if extralives==1 then
 --	spr(22,0,10)
 --end
@@ -480,23 +490,34 @@ end
 -->8
 --levels
 lvls={
+	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
 	{roids=4,lasers=1},
-	{roids=7,lasers=1,safezone=true},
-	{roids=6,lasers=1,flowers=3},
-	{roids=7,lasers=2,safezone=true},
+	{roids=6,lasers=1,safezone=true},
+	{roids=4,lasers=1,flowers=3},
 	{roids=6,bomb=true},
+	{roids=4,flowers=3,bomb=true},
+	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
 	{roids=5,lasers=2},
-	{roids=6,flowers=3,bomb=true},
+	{roids=7,lasers=2,safezone=true},
 }
 
 function spawn(level)
-	lz={}	zs={} hs={} rs={} fs={}
-	b.enabled=false
-	c=15 p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
+	local start=tick
+	local i=10
+	w.enabled=true
+	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
+	while tick-start<30 do
+		local pct=(tick-start)/30
+		pct=easeoutexpo(pct)
+		w.r=63*pct
+		yield()
+	end
+	w.enabled=false
+	c=i p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
 	while c>0 do c-=1 yield() end
 	p.enabled=true
 	for unit,num in pairs(level) do
-		c=15 --countdown spawn interval
+		c=i --countdown spawn interval
 		while true do			
 			c-=1
 			if c>0 then goto continue end
@@ -507,10 +528,11 @@ function spawn(level)
 				r.x=64+cos(a)*d r.y=64+sin(a)*d
 				local to_p=atan2(p.x-r.x,p.y-r.y)								
 				local a2=aim_away(to_p,.25)
-				local spd=rnd(2)+.5
+				local spd=rnd(1.25)+.5
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
 				r.r=3+rnd(8-3) r.enabled=true
 				add(rs,r)
+				sfx(6)
 				if #rs==num then break end
 			end
 			if unit=="safezone" then
@@ -518,21 +540,24 @@ function spawn(level)
 				z.a=rnd(1)
 				z.x=64+cos(z.a)*63
 				z.y=64+sin(z.a)*63
-				add(zs,z) 
+				add(zs,z)
+				sfx(10)
 				break
 			end
 			if unit=="lasers" then
 				local a=(1/num)*#lz+.1
 				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005})
+				sfx(7)
 				if #lz==num then break end
 			end
 			if unit=="bomb" then
 				local a=aim_away(.25,.6)
 				local d=rnd(64-24)+12
 				add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
-								r=3,dx=0,dy=0,t=.1,
+								r=3,dx=0,dy=0,t=.05,
 								enabled=true,timer=0,
-								frametick=0}) 
+								frametick=0})
+				sfx(9) 
 				break
 			end
 			if unit=="flowers" then
@@ -540,23 +565,25 @@ function spawn(level)
 				f.tick=flr(rnd(10)) 
 				f.max=12 
 				f.growgoal=30 --grow rate 
-				f.br=150 --bud rate
+				f.br=250 --bud rate
 				local r={}
 				local d=12+rnd(63-24)
-				local a=rnd()
-				if abs(a-.25)<.1 then a+=.1+rnd(.2) end
+				local a=aim_away(.25,.1)
+--				local a=rnd()
+--				if abs(a-.25)<.1 then a+=.1+rnd(.2) end
 				r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
 				r.growcount=0
 				add(f,r)
 				add(fs,f)
+				sfx(8)
 				if #fs==num then break end
 			end
-			c=15
+			c=i
 			::continue::
 			yield()
 		end
 	end
-	c=15
+	c=i
 	while c>0 do c-=1 yield() end
 end
 
@@ -609,6 +636,14 @@ function allt(f,t)
 	end
 	return true
 end
+
+function easeoutexpo(x)
+	if x==1 then
+		return 1
+	else
+		return 1-2^(-10*x)
+	end
+end
 __gfx__
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
 0000000006666660000000000e0000e00e0000e0020220200202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
@@ -643,6 +678,15 @@ __sfx__
 0005000005650096500e65013650176502165000000000001d6001e600216000000024600286002e6002f600000000000000000000001c6001d6001e6001f600000001f600206000000020600206000000021600
 000400000725008250082500a2500c2500f250132501d250232502c250332503e2500020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
 0006000a0b6200b6200b6200b6200a6200a6200b6200b6200b6200d6200d6000d6000d6000d6000d6000d60000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000e000702770027700477004770027700b7700b7700f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
-001400000a0500b0500c0500c0500c0500f0500f0500f050110501105013050130501605016050160501805018050180501b0501b0501b0500000000000000000000000000000000000000000000000000000000
-00100000240502405024050220502b0502e0502e0502e0502e0502e0502e0502b0502e05033050350502705024050220501f0501d0501b0501b0501d0501f0500000000000000000000000000000000000000000
+000e000702710027100471004710027100b7100b7100f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
+001000000a0500b0500c0500c0500c0500f0500f0500f050110501105013050130501605016050160501805018050180501b0501b0501b0501b05000000000000000000000000000000000000000000000000000
+011000000c1500a1000a1000a1000c1500a100001000a1000c1500a1000a1000a1000c1503310000100001000c1000c150001001d1000c1501b1001d1001f1000c1500010000100001000c150001000010000100
+000300002e3502e35016350113500f3500c3500a350163001330016300113000a30000300053000a3000730007300073000730007300073000c3000a300073000730000300003000030000300003000030000300
+000400000a2100a2100a2200a2300a2400a2500c2000c2000f2000f2001120016200162001b2001d2002220024200292002e200332003a2003f20000200002000020000200002000020000200002000020000200
+000500000e6600e6500e6400e6300e610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000200000c4500c4500c4500c45027450274502445024450274502745024450244500040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
+000400001b5501f550225502b55024550295503055033550005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
+000100003f5503f5503c5503a55037550375503755033550305502e550295502755024550245502255022550225501f5501d5501d5501d55018550185501655016550115500f5500f5500c5500a5500a55007550
+__music__
+00 42424344
+
