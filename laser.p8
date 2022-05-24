@@ -5,13 +5,16 @@ __lua__
 -- casey labrack
 -- todo:
 --  bg
---  nicer shield effect
+--  nicer shield effect (draw arc manually?)
 -- 	fix flowers spawn out of bounds
 -- 	starfield flyin
 --  timing or lap based enemy
 --  gun rdy
 --  multiple bullets?
---  optimized bullets
+--  optimized bullets/colls
+--  fade out animation
+--  death screen
+--  bigger min size for flowers
 
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,
@@ -30,40 +33,54 @@ b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
 w = {enabled=false,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
-lvl=1
+lvl=0
 extralives=3
 tick=0
 scoreboxes={{0,0},{7,0},{14,0},{21,0}}
-fmaxsizes={10,8,6,4}
-state="setup"
+state="wiping"
+gameover={is=false}
+cp=dp--current pallete
 
 function _init()
-intro=cocreate(spawn)
-coresume(intro,lvls[lvl])
+--intro=cocreate(spawn)
+--coresume(intro,lvls[lvl])
+--intro=cocreate(wipe)
+--coresume(intro,lvls[lvl])
+local a=cocreate(wipe)
+add(as,a)
 end
 
 function _update()
 tick+=1
 
-if state=="waiting" then
-	if costatus(waiting)~="dead" then
-		coresume(waiting)
---		return
-	else
-		state="setup"
-		intro=cocreate(spawn)
-		coresume(intro,lvls[lvl])
-	end
+-- do animations
+for a in all(as) do
+	if costatus(a)!="dead" then coresume(a)
+	else del(as,a) end
 end
 
-if state=="setup" then
-	if costatus(intro)~="dead" then
-		coresume(intro)
+	if state=="setup" then
 		return
-	else
-		state="running"
 	end
-end
+--if state=="waiting" then
+--	if costatus(waiting)~="dead" then
+--		coresume(waiting)
+----		return
+--	else
+--		state="setup"
+--		intro=cocreate(spawn)
+--		coresume(intro,lvls[lvl])
+--	end
+--end
+
+--if state=="setup" then
+--	if costatus(intro)~="dead" then
+--		coresume(intro)
+--		return
+--	else
+--		state="running"
+--	end
+--end
 
 if p.enabled then
 	p.charge+=1
@@ -141,12 +158,6 @@ for f in all(fs) do
 			end
 		end		
 	end
-end
-
--- do animations
-for a in all(as) do
-	if costatus(a)!="dead" then coresume(a)
-	else del(as,a) end
 end
 
 -- laser move
@@ -314,16 +325,19 @@ end
 ::donebullet::
 
 --level win
-if #rs==0 and #fs==0 and p.enabled then
-	lz={}
-	zs={}
-	hs={}
-	lvl+=1
+if #rs==0 and #fs==0 and p.enabled and state=="running" then
+--	lz={}
+--	zs={}
+--	hs={}
+--	lvl+=1
+	state="wiping"
 	extralives=3
 	if lvl>#lvls then lvl=1 end
-	state="setup"
-	intro=cocreate(spawn)
-	coresume(intro,lvls[lvl])
+	local a=cocreate(wipe)
+	add(as,a)
+--	state="setup"
+--	intro=cocreate(spawn)
+--	coresume(intro,lvls[lvl])
 end
 end
 
@@ -332,14 +346,18 @@ function died()
 	extralives-=1
 	if extralives<0 then lvl=1 end
 	p.enabled=false
-	state="waiting"
-	waiting=cocreate(anykey)
-	coresume(waiting,60)
+	state="death"
+--	waiting=cocreate(anykey)
+--	coresume(waiting,60)
+	local a=cocreate(death)
+	coresume(a,30,60)
+	add(as,a)
 end
 
 function _draw()
 cls()
-if not w.enabled then circ(64,64,63,6) end -- outer
+
+pal(cp)
 
 --safe zone
 for z in all(zs) do
@@ -364,15 +382,17 @@ for f in all(fs) do
 end
 
 --emitter
-circ(64,64,inner.r,6)
-circ(64,64,1,8)
-if #lz==0 then circ(64,64,1,2) end
+if state~="dead" then
+	circ(64,64,inner.r,6)
+	circ(64,64,1,8)
+	if #lz==0 then circ(64,64,1,2) end
+end
 
 --homing bombs
 for h in all(hs) do
 	if not h.enabled then pal(8,2) end
 	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
-	pal()
+	pal(cp)
 end
 
 --laser
@@ -444,13 +464,20 @@ if w.enabled then
 	circ(64,64,w.r,6)
 end
 
+if state=="dead" then
+	local msg="you died"
+	if extralives<0 then msg="gameover" end
+	print(msg,64,64,7)
+end
+
+
+pal()
+
 --hop countdown
---local f=12
---if (p.charge<p.fullcharge) f=1
 local f=p.charge<p.fullcharge and 1 or 12
 rect(105,3,126,9,f)
-local pct=p.charge/p.fullcharge
-if pct>1 then pct=1 end
+local pct=min(p.charge/p.fullcharge,1)
+--if pct>1 then pct=1 end
 rectfill(105,3,105+(126-105)*pct,9,f)
 print("tele",106,4,7)
 
@@ -462,11 +489,10 @@ end
 if w.enabled then
 	circfill(64,64,w.r,0)
 	circ(64,64,w.r,6)
+else 
+	circ(64,64,63,6)
 end
 
---if extralives==1 then
---	spr(22,0,10)
---end
 --print(stat(1),0,0)
 
 --score
@@ -476,21 +502,12 @@ end
 --	spr(sprite,scoreboxes[k][1],scoreboxes[k][2])
 --end
 
-
---print(log)
---print(lvl,0,0,10)
-
---if gameover then
-----	local l=print("gameover",-10,0)
---	print("gameover",128-30,0)
---end
-
 end
 
 -->8
 --levels
 lvls={
-	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
+--	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
 	{roids=4,lasers=1},
 	{roids=6,lasers=1,safezone=true},
 	{roids=4,lasers=1,flowers=3},
@@ -501,22 +518,27 @@ lvls={
 	{roids=7,lasers=2,safezone=true},
 }
 
-function spawn(level)
+function wipe()
 	local start=tick
-	local i=10
 	w.enabled=true
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
 	while tick-start<30 do
 		local pct=(tick-start)/30
 		pct=easeoutexpo(pct)
 		w.r=63*pct
 		yield()
 	end
+	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
 	w.enabled=false
-	c=i p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
+	lvl+=1
+	add(as,cocreate(spawn))
+end
+
+function spawn()
+	state="setup"
+	i=10 c=i p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
 	while c>0 do c-=1 yield() end
 	p.enabled=true
-	for unit,num in pairs(level) do
+	for unit,num in pairs(lvls[lvl]) do
 		c=i --countdown spawn interval
 		while true do			
 			c-=1
@@ -585,16 +607,37 @@ function spawn(level)
 	end
 	c=i
 	while c>0 do c-=1 yield() end
+	state="running"
 end
 
-function anykey(delay)
+function death(delay,duration)
+	yield()
 	while delay>0 do
 		delay-=1
 		yield()
 	end
-	while btn()==0 do
+	local start=tick
+	while tick-start<duration do
+		local pct=(tick-start)/duration
+		cp=bwp[ceil(pct*#bwp)]
 		yield()
 	end
+	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
+	start=tick
+	state="dead"
+	while btn()==0 do
+		local pct=min((tick-start)/duration,1)
+		printh("pct "..pct)
+		if pct<=1 then
+			cp=bwp[ceil((1-pct)*#bwp)]
+		else
+			cp=dp
+		end
+--		cp=pct~=1 and bwp[ceil((1-pct)*#bwp)] or dp
+		yield()
+	end
+	state="setup"
+	add(as,cocreate(spawn))
 end
 
 --get random angle that is not within margin of given angle
@@ -644,6 +687,59 @@ function easeoutexpo(x)
 		return 1-2^(-10*x)
 	end
 end
+-->8
+--palletes
+dp={ --default palette
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,--padding
+0,1,2,3,
+4,5,6,7,
+8,9,10,11,
+12,13,14,15,
+}
+local bw1={
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,--padding
+0,0,0,6,
+6,5,6,7,
+6,6,7,7,
+6,5,6,7,
+}
+local bw2={
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,--padding
+0,0,0,5,
+5,0,5,6,
+5,5,6,6,
+5,0,5,6,
+}
+local bw3={
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,--padding
+0,0,0,0,
+0,0,0,5,
+0,0,5,5,
+0,0,0,5,
+}
+local bw4={
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,--padding
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+}
+bwp={bw1,bw2,bw3,bw4}
 __gfx__
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
 0000000006666660000000000e0000e00e0000e0020220200202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
