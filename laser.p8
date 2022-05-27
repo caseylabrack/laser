@@ -9,22 +9,39 @@ __lua__
 -- 	fix flowers spawn out of bounds
 -- 	starfield flyin
 --  timing or lap based enemy
---  gun rdy
 --  multiple bullets?
 --  bigger min size for flowers
---  fade in: [two] lives left
+--  player animations
+--  gameover animations
+--  fuzziness
+
+function plines(this) 
+	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
+	local prow=.075
+	local len=6
+	local aft=len-2
+	return {
+		{x1=m.x,y1=m.y,x2=m.x-cos(p.a-prow)*len,y2=m.y-sin(p.a-prow)*len},
+		{x1=m.x,y1=m.y,x2=m.x-cos(p.a+prow)*len,y2=m.y-sin(p.a+prow)*len}
+	}
+--	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
+--	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
+end
 
 p = {x=80,y=30,dx=0,dy=0,
-					a=.75,t=.25,rt=.05,r=3,
-					friction=.92,
+					a=.75,t=.25,rt=.05,r=3,friction=.92,
 					hop=25,charge=0,fullcharge=90,
 					enabled=false,controllable=true,
-					thrusting=false}
+					thrusting=false,
+					gun=0,gunfull=160,gunfail=false,gunfailtick=0,
+					flipready=10,fliplast=0,
+					lines=plines}
 ps= {} --player death particles
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
 as= {} --animations (coroutines)
+a2= {}
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
@@ -58,7 +75,7 @@ if state=="setup" then
 end
 
 if p.enabled then
-	p.charge+=1
+	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
 	if btn(➡️) then p.a=p.a-p.rt end
 	if btn(⬅️) then p.a=p.a+p.rt end
 	if btn(⬆️) and p.charge>p.fullcharge then 
@@ -66,7 +83,13 @@ if p.enabled then
 		p.y+=sin(p.a)*p.hop
 		p.charge=0
 	end
-	if btn(⬇️) then	p.dx=0 p.dy=0 end
+	if btn(⬇️) then	
+--	p.dx=0 p.dy=0
+		if tick-p.fliplast>p.flipready then
+		 p.a+=.5
+		 p.fliplast=tick
+	 end
+	end
 	if btn(🅾️) then 
 		p.dx+=cos(p.a)*p.t
 		p.dy+=sin(p.a)*p.t
@@ -79,10 +102,18 @@ if p.enabled then
 		p.thrusting=false
 	end
 	if btn(❎) and not b.enabled then
-		b.enabled=true
-		b.x=p.x b.y=p.y b.a=p.a
-		b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
-		sfx(11)
+		if p.gun==p.gunfull then
+			b.enabled=true
+			b.x=p.x b.y=p.y b.a=p.a
+			b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
+			sfx(11)
+		else 
+			if tick-p.gunfailtick>10 then
+				p.gunfail=true
+				sfx(12)
+				p.gunfailtick=tick
+			end
+		end
 	end
 end
 p.x=p.x+p.dx
@@ -94,7 +125,7 @@ p.dy*=p.friction
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
-		if p.enabled and touching(p,l) then died() end
+		if p.enabled and touching(p,l) then died(l) end
 		l.growcount+=1
 		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
@@ -115,7 +146,13 @@ for f in all(fs) do
 				i+=1
 				l=rnd(couldbuds)
 				ang=rnd(1)
-				k.x=l.x+cos(ang)*l.r	k.y=l.y+sin(ang)*l.r
+				k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
+				i2=0
+				while distt(k,inner)>63 and i2<100 do
+					i2+=1
+					ang=rnd(1)
+					k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
+				end
 				k.r=8	
 				colliding=false
 				for m in all(f) do
@@ -128,8 +165,10 @@ for f in all(fs) do
 				end
 			end
 			if i<100 then
-				k.r=2	k.growcount=0
-				add(f,k)
+--				if distt(k,inner)<62 then
+					k.r=2	k.growcount=0
+					add(f,k)
+--				end
 			end
 		end		
 	end
@@ -196,12 +235,12 @@ end
 if p.enabled then
 	-- player vs. obstacles
 	for v in all(rs) do
-		if (touching(p,v)) died()
+		if (touching(p,v)) died(v)
 	end
 	
 	--player vs. homing bombs
 	for h in all(hs) do
-		if (touching(p,h)) died()
+		if (touching(p,h)) died(h)
 	end
 end
 
@@ -215,9 +254,7 @@ if p.enabled then
 	if vulnerable then
 		for l in all(lz) do
 			if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
-				p.enabled=false
-				add(ps,{x1=p.x,y1=p.y,x2=p.x+3,y2=p.y+3})
-				died()
+				died(l)
 			end
 		end
 	end
@@ -301,31 +338,29 @@ end
 
 --level win
 if #rs==0 and #fs==0 and p.enabled and state=="running" then
---	lz={}
---	zs={}
---	hs={}
---	lvl+=1
 	state="wiping"
 	extralives=3
 	if lvl>#lvls then lvl=1 end
 	local a=cocreate(wipe)
 	add(as,a)
---	state="setup"
---	intro=cocreate(spawn)
---	coresume(intro,lvls[lvl])
 end
 end
 
-function died()
+function died(cause)
+	if state~="running" then return end
 	sfx(2,-2)
+	sfx(13)
+	p.enabled=false
+	local d=cocreate(deathparticles)
+	coresume(d,cause)
+	add(a2,d)
 	extralives-=1
 	if extralives<0 then lvl=1 end
-	p.enabled=false
 	state="death"
 --	waiting=cocreate(anykey)
 --	coresume(waiting,60)
 	local a=cocreate(death)
-	coresume(a,30,60)
+	coresume(a,15,30)
 	add(as,a)
 end
 
@@ -333,6 +368,12 @@ function _draw()
 cls()
 
 pal(cp)
+
+--do animations
+for z in all(a2) do
+	if costatus(z)!="dead" then assert(coresume(z))
+	else del(a2,z) end
+end
 
 --safe zone
 for z in all(zs) do
@@ -365,9 +406,13 @@ end
 
 --homing bombs
 for h in all(hs) do
-	if not h.enabled then pal(8,2) end
+--	if not h.enabled then pal(8,2) end
+	if h.enabled then
 	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
-	pal(cp)
+	else
+	spr(23,h.x-4,h.y-4)
+	end
+--	pal(cp)
 end
 
 --laser
@@ -409,9 +454,9 @@ if p.enabled then
 	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
 	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
 --circfill(m.x-cos(p.a)*2,m.y-sin(p.a)*2,1,7)
-else 
-	for p2 in all(ps) do
-		line(p2.x1,p2.y1,p2.x2,p2.y2,7)
+	if p.gunfail then
+		circ(m.x,m.y,2,12)
+		p.gunfail=false
 	end
 end
 
@@ -456,6 +501,14 @@ local pct=min(p.charge/p.fullcharge,1)
 rectfill(105,3,105+(126-105)*pct,9,f)
 print("tele",106,4,7)
 
+--gun countdown
+local x,x2,y,y2=110,126,11,17
+local f=p.gun<p.gunfull and 3 or 11
+rect(x,y,x2,y2,f)
+local pct=min(p.gun/p.gunfull,1)
+rectfill(x,y,x+(x2-x)*pct,y2,f)
+print("gun",x+2,y+1,7)
+
 print("sector "..lvl,0,0,7)
 for i=1,extralives do
 	spr(22,i*6-6,10)
@@ -490,6 +543,7 @@ end
 -->8
 --levels
 lvls={
+--	{flowers=1,bomb=true},
 	{roids=4,lasers=1},
 	{roids=6,lasers=1,safezone=true},
 	{roids=4,lasers=1,flowers=3},
@@ -517,9 +571,14 @@ end
 
 function spawn()
 	state="setup"
-	i=10 c=i p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0
-	while c>0 do c-=1 yield() end
+	i=10 c=15 p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0 p.gun=0
+	--player entering animation
 	p.enabled=true
+	local enteranim=cocreate(penter)
+	coresume(enteranim,p.x,p.y,c)
+	add(a2,enteranim)
+	while c>0 do c-=1 yield() end
+	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
 		c=i --countdown spawn interval
 		while true do			
@@ -572,9 +631,7 @@ function spawn()
 				f.br=250 --bud rate
 				local r={}
 				local d=12+rnd(63-24)
-				local a=aim_away(.25,.1)
---				local a=rnd()
---				if abs(a-.25)<.1 then a+=.1+rnd(.2) end
+				local a=aim_away(.25,.25)
 				r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
 				r.growcount=0
 				add(f,r)
@@ -609,7 +666,6 @@ function death(delay,duration)
 	state="dead"
 	while btn()==0 do
 		local pct=min((tick-start)/duration,1)
-		printh("pct "..pct)
 		if pct<=1 then
 			cp=bwp[ceil((1-pct)*#bwp)]
 		else
@@ -623,10 +679,88 @@ function death(delay,duration)
 	add(as,cocreate(spawn))
 end
 
---get random angle that is not within margin of given angle
-function aim_away(ang,margin)
-	local margin=margin or .25
-	return rnd(1-margin)+ang+margin/2
+--player enter
+function penter(x,y,duration)
+	local start=tick
+	local t=0
+	local dur=duration/2
+	while t<1 do
+		t=(tick-start)/dur
+		t=easeoutexpo(t)
+		line(x,y,x+30*t,y)
+		line(x,y,x-30*t,y)
+		line(x,y,x,y+30*t)
+		line(x,y,x,y-30*t)
+		circfill(x,y,t*6,7)
+		yield()
+	end
+	start=tick
+	t=0
+	while t<1 do
+		t=(tick-start)/dur
+		t=easeoutexpo(t)
+		line(x,y,x+30*(1-t),y)
+		line(x,y,x-30*(1-t),y)
+		line(x,y,x,y+30*(1-t))
+		line(x,y,x,y-30*(1-t))
+		circfill(x,y,(1-t)*6,7)
+		yield()
+	end
+end
+
+--player death particles
+function deathparticles(cause)
+	local lines=p:lines()
+	
+	for l in all(lines) do
+		l.dx,l.dy=cause.dx or p.dx,cause.dy or p.dy
+		l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
+		l.dr=rnd(.05) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
+		local ang=atan2(l.midx-p.x,l.midy-p.y)
+		l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
+	end
+	
+	local parts={}
+	local s = 4 --dist spread
+	local ds=.1 --speed spread
+	for i=1,10 do
+		local z = {x=p.x+rndr(-s,s),
+													y=p.y+rndr(-s,s),
+													dx=(cause.dx or p.dx)+rndr(-ds,ds),
+													dy=(cause.dy or p.dy)+rndr(-ds,ds)}
+		local ang=atan2(z.x-p.x,z.y-p.y)
+		z.dx+=cos(ang)*0.1
+		z.dy+=sin(ang)*0.1
+		add(parts,z)
+	end
+	
+	local i=10	
+	while not p.enabled do
+		i-=1
+		pal(dp)
+		
+		if i>0 then
+			camera(rnd(4)-2,rnd(4)-2)
+		else
+			camera()
+		end
+		color(7)
+		for l in all(lines) do
+			l.midx+=l.dx 
+			l.midy+=l.dy 
+			l.r+=l.dr
+			line(l.midx-cos(l.r)*4,
+								l.midy-sin(l.r)*4,
+								l.midx+cos(l.r)*4,
+								l.midy+sin(l.r)*4)
+		end
+		for z in all(parts) do
+			z.x+=z.dx z.y+=z.dy
+			pset(z.x,z.y)
+		end		
+		pal(cp)
+		yield()
+	end
 end
 -->8
 --utils
@@ -669,6 +803,16 @@ function easeoutexpo(x)
 	else
 		return 1-2^(-10*x)
 	end
+end
+
+--get random angle that is not within margin of given angle
+function aim_away(ang,margin)
+	local margin=margin or .25
+	return rnd(1-margin)+ang+margin/2
+end
+
+function rndr(low,high)
+	return low+rnd(high-low)
 end
 -->8
 --palletes
@@ -733,12 +877,12 @@ __gfx__
 0000000006666660000000000e0000e00e0000e002022020020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
 0f00000000f00000000f00000000f0000008000000eee00000700000000000000000000000000000000000000000000000000000000000000000000000000000
-00f0000f000f00000000f00000000f00008080000e00eee000700000000000000000000000000000000000000000000000000000000000000000000000000000
-00fffff000ffff0f00ffff000fffff0008eee800e00000ee07770000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f0000f88ff00ff88f0ff0f88f0080e8e080e000000e77077000000000000000000000000000000000000000000000000000000000000000000000000000
-00f88f000ff88f00f0f88ff000f88f0f08eee800e00000ee70007000000000000000000000000000000000000000000000000000000000000000000000000000
-0fffff00f0ffff0000ffff0000fffff0008080000e000ee000000000000000000000000000000000000000000000000000000000000000000000000000000000
-f0000f000000f000000f000000f00000000800000ee0ee0000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00f0000f000f00000000f00000000f00008080000e00eee000700000ff0000ff0000000000000000000000000000000000000000000000000000000000000000
+00fffff000ffff0f00ffff000fffff0008eee800e00000ee0777000000ffff000000000000000000000000000000000000000000000000000000000000000000
+00f88f0000f88ff00ff88f0ff0f88f0080e8e080e000000e7707700000f22f000000000000000000000000000000000000000000000000000000000000000000
+00f88f000ff88f00f0f88ff000f88f0f08eee800e00000ee7000700000f22f000000000000000000000000000000000000000000000000000000000000000000
+0fffff00f0ffff0000ffff0000fffff0008080000e000ee00000000000ffff000000000000000000000000000000000000000000000000000000000000000000
+f0000f000000f000000f000000f00000000800000ee0ee0000000000ff0000ff0000000000000000000000000000000000000000000000000000000000000000
 000000f000000f000000f000000f000000000000000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 05555500088888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -766,6 +910,14 @@ __sfx__
 000200000c4500c4500c4500c45027450274502445024450274502745024450244500040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
 000400001b5501f550225502b55024550295503055033550005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
 000100003f5503f5503c5503a55037550375503755033550305502e550295502755024550245502255022550225501f5501d5501d5501d55018550185501655016550115500f5500f5500c5500a5500a55007550
+000800000352000510075000750007500075000750007500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00020000316503165030650316503a70037700306502c6502d6502e650307003370033700276002c6502d6502c65030700276002d6502c650306503365000700007002a6502a650296500070024650226501f650
+001400000c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a12007120
+011400000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a65005600036000060005650006000060000600
+001400001145011450114501145011400114001345216452114001345016450164001145011450114501145000400274002740027400274000040000400004000040000400004000040000400004000040000400
+011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
 __music__
-00 42424344
+00 0e0f4344
+00 0e0f4344
+00 0e110f44
 
