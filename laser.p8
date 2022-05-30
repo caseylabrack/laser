@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 33
 __lua__
--- lasers
+-- zag
 -- casey labrack
 -- todo:
 --  bg
@@ -45,10 +45,12 @@ a2= {}
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false}
+bp= {} --bullet particles
+lp= {} --laser particles
 w = {enabled=false,r=0}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63}
-lvl=0
+lvl=1
 extralives=3
 tick=0
 scoreboxes={{0,0},{7,0},{14,0},{21,0}}
@@ -66,7 +68,7 @@ tick+=1
 
 -- do animations
 for a in all(as) do
-	if costatus(a)!="dead" then coresume(a)
+	if costatus(a)!="dead" then assert(coresume(a))
 	else del(as,a) end
 end
 
@@ -166,7 +168,7 @@ for f in all(fs) do
 			end
 			if i<100 then
 --				if distt(k,inner)<62 then
-					k.r=2	k.growcount=0
+					k.r=2	k.growcount=0 k.hit=-100
 					add(f,k)
 --				end
 			end
@@ -179,6 +181,21 @@ for l in all(lz) do
 	l.a-= l.speed
 	l.x = 64 + cos(l.a) * 63
 	l.y = 64 + sin(l.a) * 63
+	for z in all(l.parts) do
+		z.x+=z.dx z.y+=z.dy
+		z.dx*=.95 z.dy*=.95
+		if tick-z.tick>5 then
+			del(l.parts,z)
+		end
+	end
+		local z={}
+		z.x,z.y=l.x,l.y
+		z.a=l.a+.5+rndr(-.25,.25)
+		z.dx=cos(z.a)*rndr(1,2)
+		z.dy=sin(z.a)*rndr(1,2)
+		z.tick=tick
+		add(l.parts,z)
+--	end
 end
 
 -- safe zones
@@ -303,6 +320,7 @@ if b.enabled then
 					b.enabled=false
 					l.r-=2
 					l.growcount=0
+					l.hit=tick
 					if l.r<3 then	
 						del(f,l)
 						if #f==0 then del(fs,f) end 
@@ -314,7 +332,8 @@ if b.enabled then
 		for v in all(rs) do --roids
 			if touching(b,v) then
 				b.enabled=false
-				v.r-=2
+				v.r-=1
+				v.hit=tick
 				if v.r<2 then	del(rs,v) end
 				goto donebullet
 			end
@@ -340,6 +359,7 @@ end
 if #rs==0 and #fs==0 and p.enabled and state=="running" then
 	state="wiping"
 	extralives=3
+	lvl+=1
 	if lvl>#lvls then lvl=1 end
 	local a=cocreate(wipe)
 	add(as,a)
@@ -355,7 +375,7 @@ function died(cause)
 	coresume(d,cause)
 	add(a2,d)
 	extralives-=1
-	if extralives<0 then lvl=1 end
+--	if extralives<0 then lvl=1 end
 	state="death"
 --	waiting=cocreate(anykey)
 --	coresume(waiting,60)
@@ -389,7 +409,7 @@ end
 for f in all(fs) do
 	for l in all(f) do
 			fillp(ˇ)
-			circfill(l.x,l.y,l.r,11)
+			circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
 			fillp()
 	end
 	for l in all(f) do
@@ -416,43 +436,29 @@ for h in all(hs) do
 end
 
 --laser
-for l in all(lz) do 	
+for l in all(lz) do 
+	line(64,64,l.x,l.y,8)	
 	if rnd(1)>.1 then  
-		line(64,64,l.x,l.y,8)
-	else
-		line(64,64,l.x,l.y,7)
---		circfill(l.x,l.y,rnd(3),8)
+		circfill(l.x,l.y,rnd(2),8)
 	end
-end
---burn trail
-for l in all(lz) do
-	for i=1,5 do
-		local a=l.a+.0025*i
-		local f=8
---		if i>3 then f=2 end
-		circfill(64+cos(a)*63,64+sin(a)*63,.75,f)
-	--	pset(64+cos(a)*63,64+sin(a)*63,f)
+	for z in all(l.parts) do
+		pset(z.x,z.y,8)
 	end
 end
 
 --player
 if p.enabled then
 	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
-	local prow=.075
+	local prow=.05
 	local len=6
 	local aft=len-2
 	if p.thrusting then
-		line(m.x-cos(p.a-prow)*aft,
-							m.y-sin(p.a-prow)*aft,
-							m.x-cos(p.a)*(aft+1),
-							m.y-sin(p.a)*(aft+1),12)
-		line(m.x-cos(p.a+prow)*aft,
-							m.y-sin(p.a+prow)*aft,
-							m.x-cos(p.a)*(aft+1),
-							m.y-sin(p.a)*(aft+1),12)
+		circfill(m.x-cos(p.a)*len,m.y-sin(p.a)*len,1,rndr(8,11))
 	end
-	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len,7)
-	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,7)
+	color(7)
+	line(m.x,m.y,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len)
+	line(m.x,m.y,m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len)
+	line(m.x-cos(p.a+prow)*len,m.y-sin(p.a+prow)*len,m.x-cos(p.a-prow)*len,m.y-sin(p.a-prow)*len)
 --circfill(m.x-cos(p.a)*2,m.y-sin(p.a)*2,1,7)
 	if p.gunfail then
 		circ(m.x,m.y,2,12)
@@ -462,10 +468,7 @@ end
 
 -- roids
 for v in all(rs) do
---	fillp(⧗)
---	circfill(v.x,v.y,v.r,9)
---	fillp()
-	circ(v.x,v.y,v.r,9)
+	circ(v.x,v.y,v.r,tick-v.hit>2 and 9 or 7)
 	spr(2,v.x-4,v.y-4)
 	local a=atan2(v.dx,v.dy)-.5
 	local x=v.x+cos(a)*v.r
@@ -484,12 +487,6 @@ if w.enabled then
 	circ(64,64,w.r,6)
 end
 
-if state=="dead" then
-	local msg=""..extralives.." mulligans left\nthis sector"
-	if extralives<0 then msg="gameover" end
-	print(msg,64,64,7)
-end
-
 
 pal()
 
@@ -498,7 +495,9 @@ local f=p.charge<p.fullcharge and 1 or 12
 rect(105,3,126,9,f)
 local pct=min(p.charge/p.fullcharge,1)
 --if pct>1 then pct=1 end
+fillp(…)
 rectfill(105,3,105+(126-105)*pct,9,f)
+fillp()
 print("tele",106,4,7)
 
 --gun countdown
@@ -509,9 +508,11 @@ local pct=min(p.gun/p.gunfull,1)
 rectfill(x,y,x+(x2-x)*pct,y2,f)
 print("gun",x+2,y+1,7)
 
-print("sector "..lvl,0,0,7)
-for i=1,extralives do
-	spr(22,i*6-6,10)
+if state=="running" or state=="setup" then
+	print("sector "..lvl,0,0,7)
+	for i=1,extralives do
+		spr(22,i*6-6,10)
+	end
 end
 
 if w.enabled then
@@ -543,14 +544,15 @@ end
 -->8
 --levels
 lvls={
---	{flowers=1,bomb=true},
-	{roids=4,lasers=1},
+	{flowers=1,lasers=1},
+--	{roids=4,lasers=1},
 	{roids=6,lasers=1,safezone=true},
-	{roids=4,lasers=1,flowers=3},
-	{roids=6,bomb=true},
+	{roids=4,lasers=1,flowers=2},
+	{roids=5,lasers=1,flowers=4},
+	{roids=5,lasers=1,flowers=4,safezone=true},
+	{roids=4,bomb=true},
 	{roids=4,flowers=3,bomb=true},
 	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
-	{roids=5,lasers=2},
 	{roids=7,lasers=2,safezone=true},
 }
 
@@ -565,7 +567,6 @@ function wipe()
 	end
 	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
 	w.enabled=false
-	lvl+=1
 	add(as,cocreate(spawn))
 end
 
@@ -573,11 +574,12 @@ function spawn()
 	state="setup"
 	i=10 c=15 p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=0 p.a=0 p.gun=0
 	--player entering animation
-	p.enabled=true
 	local enteranim=cocreate(penter)
 	coresume(enteranim,p.x,p.y,c)
 	add(a2,enteranim)
 	while c>0 do c-=1 yield() end
+	p.enabled=true
+	
 	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
 		c=i --countdown spawn interval
@@ -594,6 +596,7 @@ function spawn()
 				local spd=rnd(1.25)+.5
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
 				r.r=3+rnd(8-3) r.enabled=true
+				r.hit=-10
 				add(rs,r)
 				sfx(6)
 				if #rs==num then break end
@@ -609,7 +612,7 @@ function spawn()
 			end
 			if unit=="lasers" then
 				local a=(1/num)*#lz+.1
-				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005})
+				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
 				sfx(7)
 				if #lz==num then break end
 			end
@@ -633,7 +636,7 @@ function spawn()
 				local d=12+rnd(63-24)
 				local a=aim_away(.25,.25)
 				r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
-				r.growcount=0
+				r.growcount=0 r.hit=-100
 				add(f,r)
 				add(fs,f)
 				sfx(8)
@@ -664,6 +667,10 @@ function death(delay,duration)
 	lz={}	zs={} hs={} rs={} fs={} b.enabled=false
 	start=tick
 	state="dead"
+	if extralives<0 then
+		gameoveranimation=cocreate(gameover)
+		add(a2,gameoveranimation)
+	end
 	while btn()==0 do
 		local pct=min((tick-start)/duration,1)
 		if pct<=1 then
@@ -675,8 +682,67 @@ function death(delay,duration)
 		yield()
 	end
 	cp=dp
+	if extralives<0 then
+		del(a2,gameoveranimation)
+		lvl=1
+		local a=cocreate(wipe)
+		add(as,a)
+	else
 	state="setup"
 	add(as,cocreate(spawn))
+	end
+end
+
+function gameover()
+	local wid=print("gameover",129,0)-129
+	print("gameover",64-wid/2,64-4)
+	local start=tick
+	local c=0
+	local tw=60--trackwidth
+	local lvlstotal=20
+	local tt=3 --ticks total
+	local ts=tw/(#lvls/tt)--tick spacing
+	local tb=64-tw/2 --ticks begin
+	local yt=76 --tracks y pos
+	local mascots={
+		[0]=function(x,y) --roid
+			circ(x,y,3,9)
+			spr(2,x-4,y-4)
+		end,
+		[1]=function(x,y) --flower
+			fillp(ˇ)
+			circfill(x,y,4,11)
+			fillp()
+			spr(20,x-4,y-4)
+		end,
+		[2]=function(x,y) --bomb
+			spr(18,x-4,y-4)
+		end,
+	}
+	while true do
+		c+=1
+		print("gameover",64-wid/2,64-4)
+		
+		for i=0,tt do
+			line(tb+i*ts,yt,tb+i*ts,yt+2,7)
+			if i*5>lvl then
+				for i=0,15 do
+					pal(i,1)
+				end
+			end
+			if mascots[i]~=nil then
+				mascots[i](64-tw/2+i*ts,yt+8)
+			end
+			pal(cp)
+		end
+		
+		if c>30 then -- progress line
+			local pct=min(1,(c-30)/10)
+			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
+		end
+		
+		yield()
+	end
 end
 
 --player enter
@@ -684,6 +750,7 @@ function penter(x,y,duration)
 	local start=tick
 	local t=0
 	local dur=duration/2
+	sfx(18)
 	while t<1 do
 		t=(tick-start)/dur
 		t=easeoutexpo(t)
@@ -691,7 +758,7 @@ function penter(x,y,duration)
 		line(x,y,x-30*t,y)
 		line(x,y,x,y+30*t)
 		line(x,y,x,y-30*t)
-		circfill(x,y,t*6,7)
+		circfill(x,y,t*4,7)
 		yield()
 	end
 	start=tick
@@ -867,6 +934,11 @@ local bw4={
 0,0,0,0,
 }
 bwp={bw1,bw2,bw3,bw4}
+-->8
+--laser particles
+--function 
+--	
+--end
 __gfx__
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
 0000000006666660000000000e0000e00e0000e0020220200202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
@@ -876,14 +948,14 @@ __gfx__
 0070070066dddd660008000000eeee0000eeee002022220220222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
 0000000006666660000000000e0000e00e0000e002022020020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
 00000000006dd600000000000000000000000000002002000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
-0f00000000f00000000f00000000f0000008000000eee00000700000000000000000000000000000000000000000000000000000000000000000000000000000
-00f0000f000f00000000f00000000f00008080000e00eee000700000ff0000ff0000000000000000000000000000000000000000000000000000000000000000
+0f00000000f00000000f00000000f0000008000000eee00000700000f000000f0000000000000000000000000000000000000000000000000000000000000000
+00f0000f000f00000000f00000000f00008080000e00eee0007000000f0000f00000000000000000000000000000000000000000000000000000000000000000
 00fffff000ffff0f00ffff000fffff0008eee800e00000ee0777000000ffff000000000000000000000000000000000000000000000000000000000000000000
 00f88f0000f88ff00ff88f0ff0f88f0080e8e080e000000e7707700000f22f000000000000000000000000000000000000000000000000000000000000000000
 00f88f000ff88f00f0f88ff000f88f0f08eee800e00000ee7000700000f22f000000000000000000000000000000000000000000000000000000000000000000
 0fffff00f0ffff0000ffff0000fffff0008080000e000ee00000000000ffff000000000000000000000000000000000000000000000000000000000000000000
-f0000f000000f000000f000000f00000000800000ee0ee0000000000ff0000ff0000000000000000000000000000000000000000000000000000000000000000
-000000f000000f000000f000000f000000000000000ee00000000000000000000000000000000000000000000000000000000000000000000000000000000000
+f0000f000000f000000f000000f00000000800000ee0ee00000000000f0000f00000000000000000000000000000000000000000000000000000000000000000
+000000f000000f000000f000000f000000000000000ee00000000000f000000f0000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 05555500088888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 55050550880808800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -916,6 +988,7 @@ __sfx__
 011400000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a65005600036000060005650006000060000600
 001400001145011450114501145011400114001345216452114001345016450164001145011450114501145000400274002740027400274000040000400004000040000400004000040000400004000040000400
 011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
+000800000f5501b550275503355000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
 __music__
 00 0e0f4344
 00 0e0f4344
