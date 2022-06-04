@@ -66,29 +66,29 @@ if p.enabled then
 	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
 	if btn(➡️) then p.a=p.a-p.rt end
 	if btn(⬅️) then p.a=p.a+p.rt end
-	if btn(⬇️) then	
+	if btn(⬇️) then
 		if tick-p.fliplast>p.flipready then
 		 p.a+=.5
 		 p.fliplast=tick
 	 end
 	end
-	if btn(🅾️) then 
+	if btn(🅾️) then
 		p.dx+=cos(p.a)*p.t
 		p.dy+=sin(p.a)*p.t
 		if not p.thrusting then
 			p.thrusting=true
 			sfx(2)
 		end
-	else 
+	else
 		sfx(2,-2)
 		p.thrusting=false
 	end
-	if btn(⬆️) and p.charge>p.fullcharge then 
+	if btn(⬆️) and p.charge>p.fullcharge then
 --		local x2,y2=p.x+cos(p.a)*p.hop,p.y+sin(p.a)*p.hop
 		local x1,y1=p.x,p.y
 		local dur=8
 		p.x+=cos(p.a)*p.hop
-		p.y+=sin(p.a)*p.hop		
+		p.y+=sin(p.a)*p.hop
 		p.thrusting=false
 		blink=cocreate(blink_anim)
 --		coresume(blink,p.x,p.y,x2,y2,dur)
@@ -102,7 +102,7 @@ if p.enabled then
 			b.x=p.x b.y=p.y b.a=p.a
 			b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
 			sfx(20)
-		else 
+		else
 			if tick-p.gunfailtick>10 then
 				p.gunfail=true
 				sfx(12)
@@ -127,7 +127,7 @@ for f in all(fs) do
 				l.r+=1
 				l.growcount=0
 			end
-		end	
+		end
 	end
 	if f.tick%150==0 and #f<f.max then --bud
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
@@ -148,7 +148,7 @@ for f in all(fs) do
 					ang=rnd(1)
 					k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
 				end
-				k.r=8	
+				k.r=8
 				colliding=false
 				for m in all(f) do
 					if m~=l then
@@ -165,7 +165,7 @@ for f in all(fs) do
 					add(f,k)
 --				end
 			end
-		end		
+		end
 	end
 end
 
@@ -210,10 +210,10 @@ for h in all(hs) do
 		local a=atan2(p.x-h.x+rnd(4)-2,p.y-h.y+rnd(4)-2)
 		h.dx+=cos(a)*h.t	 h.dy+=sin(a)*h.t
 		h.frametick+=1
-	else 
+	else
 		h.timer-=1
 		if h.timer<0 then h.enabled=true end
---		sfx(3)	
+--		sfx(3)
 	end
 	h.dx*=.97 h.dy*=.97
 	h.x+=h.dx	h.y+=h.dy
@@ -224,7 +224,7 @@ for h in all(hs) do
 	end
 	if dist(h.x,h.y,64,64)>63 then
 		h.x=64+cos(a2)*63
-		h.y=64+sin(a2)*63	
+		h.y=64+sin(a2)*63
 	end
 end
 
@@ -232,13 +232,13 @@ local ang=atan2(p.x-64,p.y-64)
 
 -- player vs outside wall
 if dist(p.x,p.y,64,64) > 63 then
-	p.x=64+cos(ang)*63 
+	p.x=64+cos(ang)*63
 	p.y=64+sin(ang)*63
 end
 
 -- player vs inside wall
 if touching(inner,p) then
-	p.x=64+cos(ang)*8 
+	p.x=64+cos(ang)*8
 	p.y=64+sin(ang)*8
 end
 
@@ -247,7 +247,7 @@ if p.enabled then
 	for v in all(rs) do
 		if (touching(p,v)) died(v)
 	end
-	
+
 	--player vs. homing bombs
 	for h in all(hs) do
 		if (touching(p,h)) died(h)
@@ -273,7 +273,7 @@ end
 --bouncing around
 for v in all(rs) do
 	if not v.enabled then goto continue end
-	v.x=v.x+v.dx 
+	v.x=v.x+v.dx
 	v.y=v.y+v.dy
 	if dist(v.x,v.y,64,64)>63 then
 		local a=atan2(v.x-64,v.y-64)
@@ -310,7 +310,7 @@ for bp in all(b.parts) do
 	end
 end
 if b.enabled then
-	local x1=b.x 
+	local x1=b.x
 	local y1=b.y
 	for i=1,5 do
 		b.x=x1+b.dx*i/5
@@ -326,9 +326,9 @@ if b.enabled then
 					l.r-=2
 					l.growcount=0
 					l.hit=tick
-					if l.r<3 then	
+					if l.r<3 then
 						del(f,l)
-						if #f==0 then del(fs,f) end 
+						if #f==0 then del(fs,f) end
 					end
 					goto donebullet
 				end
@@ -444,9 +444,9 @@ for h in all(hs) do
 end
 
 --laser
-for l in all(lz) do 
-	line(64,64,l.x,l.y,8)	
-	if rnd(1)>.1 then  
+for l in all(lz) do
+	line(64,64,l.x,l.y,8)
+	if rnd(1)>.1 then
 		circfill(l.x,l.y,rnd(2),8)
 	end
 	for z in all(l.parts) do
@@ -457,7 +457,7 @@ end
 --player
 if p.enabled then
 	local lines,fire,prow=p:coords()
-	if p.thrusting then 
+	if p.thrusting then
 		circfill(fire.x,fire.y,1,rndr(8,11))
 	end
 	for l in all(lines) do
@@ -523,11 +523,11 @@ end
 --if w.enabled then
 --	circfill(64,64,w.r,0)
 --	circ(64,64,w.r,6)
---else 
+--else
 --	circ(64,64,63,6)
 --end
 
-if outer.enabled then 
+if outer.enabled then
 	circ(outer.x,outer.y,outer.r,6)
 end
 
@@ -594,11 +594,11 @@ function spawn()
 	add(a2,enteranim)
 	while c>0 do c-=1 yield() end
 	p.enabled=true
-	
+
 	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
 		c=i --countdown spawn interval
-		while true do			
+		while true do
 			c-=1
 			if c>0 then goto continue end
 			if unit=="roids" then
@@ -606,7 +606,7 @@ function spawn()
 				local a=aim_away(.25,.25)
 				local d=rnd(64-24)+12
 				r.x=64+cos(a)*d r.y=64+sin(a)*d
-				local to_p=atan2(p.x-r.x,p.y-r.y)								
+				local to_p=atan2(p.x-r.x,p.y-r.y)
 				local a2=aim_away(to_p,.25)
 				local spd=rnd(1.25)+.5
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
@@ -638,14 +638,14 @@ function spawn()
 								r=3,dx=0,dy=0,t=.05,
 								enabled=true,timer=0,
 								frametick=0})
-				sfx(9) 
+				sfx(9)
 				break
 			end
 			if unit=="flowers" then
 				local f={}
-				f.tick=flr(rnd(10)) 
-				f.max=12 
-				f.growgoal=30 --grow rate 
+				f.tick=flr(rnd(10))
+				f.max=12
+				f.growgoal=30 --grow rate
 				f.br=250 --bud rate
 				local r={}
 				local d=12+rnd(63-24)
@@ -737,7 +737,7 @@ function gameover()
 	while true do
 		c+=1
 		print("gameover",64-wid/2,64-4)
-		
+
 		for i=0,tt do
 			line(tb+i*ts,yt,tb+i*ts,yt+2,7)
 			if i*5>lvl then
@@ -750,12 +750,12 @@ function gameover()
 			end
 			pal(cp)
 		end
-		
+
 		if c>30 then -- progress line
 			local pct=min(1,(c-30)/10)
 			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
 		end
-		
+
 		yield()
 	end
 end
@@ -919,12 +919,12 @@ function blink_anim(x1,y1,x2,y2,duration)
 end
 
 --ship lines,rocket point,prow
-function p:coords() 
+function p:coords()
 	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
 	local prow=.05
 	local len=6
 	local aft=len-2
-	return 
+	return
 	-- ship lines
 	{
 		{x1=m.x,y1=m.y,x2=m.x-cos(p.a-prow)*len,y2=m.y-sin(p.a-prow)*len},
@@ -941,7 +941,7 @@ end
 --player death particles
 function deathparticles(cause)
 	local lines=p:coords()
-	
+
 	for l in all(lines) do
 		l.dx,l.dy=cause.dx or p.dx,cause.dy or p.dy
 		l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
@@ -949,7 +949,7 @@ function deathparticles(cause)
 		local ang=atan2(l.midx-p.x,l.midy-p.y)
 		l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
 	end
-	
+
 	local parts={}
 	local s = 4 --dist spread
 	local ds=.1 --speed spread
@@ -963,12 +963,12 @@ function deathparticles(cause)
 		z.dy+=sin(ang)*0.1
 		add(parts,z)
 	end
-	
-	local i=10	
+
+	local i=10
 	while not p.enabled do
 		i-=1
 		pal(dp)
-		
+
 		if i>0 then
 			camera(rnd(4)-2,rnd(4)-2)
 		else
@@ -976,8 +976,8 @@ function deathparticles(cause)
 		end
 		color(7)
 		for l in all(lines) do
-			l.midx+=l.dx 
-			l.midy+=l.dy 
+			l.midx+=l.dx
+			l.midy+=l.dy
 			l.r+=l.dr
 			line(l.midx-cos(l.r)*3,
 								l.midy-sin(l.r)*3,
@@ -987,7 +987,7 @@ function deathparticles(cause)
 		for z in all(parts) do
 			z.x+=z.dx z.y+=z.dy
 			pset(z.x,z.y)
-		end		
+		end
 		pal(cp)
 		yield()
 	end
@@ -1083,4 +1083,3 @@ __music__
 00 0e0f4344
 00 0e0f4344
 00 0e110f44
-
