@@ -292,7 +292,7 @@ if p.enabled then
 	local d=dist(p.x,p.y,64,64)
 	local vulnerable=true
 	for z in all(zs) do
-		if z.state=="idle" and touching(p,z) then vulnerable=false break end
+		if z.state~="moving" and touching(p,z) then vulnerable=false break end
 	end
 	if vulnerable then
 		for l in all(lz) do
@@ -596,7 +596,7 @@ end
 -->8
 --levels
 lvls={
---	{flowers=1,lasers=1,safezone=true},
+	{flowers=1,lasers=1,safezone=true},
 	{roids=4,lasers=1},
 	{roids=6,lasers=1,safezone=true},
 	{roids=4,lasers=1,flowers=2},
