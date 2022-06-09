@@ -8,7 +8,6 @@ __lua__
 --  progress line fix
 --  title scan effect
 --  selectable # of mulligans? (easy, normal...)
---  shield machine
 --  timing or lap based enemy? (boss?)
 
 p = {x=80,y=30,dx=0,dy=0,
@@ -29,7 +28,7 @@ b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false,parts={}}
 bp= {} --bullet particles
 lp= {} --laser particles
 inner = {x=64,y=64,r=6}
-outer = {x=64,y=64,r=63,enabled=false}
+outer = {x=64,y=64,r=63,enabled=true}
 lvl=1
 mulligans=1
 extralives=mulligans
@@ -81,17 +80,6 @@ if sleep>0 then
 	sleep-=1
 	return
 end
-
--- give title screen bomb something to chase
---if state=="title" then
---	if rnd()>.9 then 
---		p.a,p.x,p.y=rnd(),64+cos(p.a)*63,64+sin(p.a)*63
---	end
---	if btn()>0 then
---		state="wipe"
---		wipe=cocreate(wipe_anim)
---	end
---end
 
 if p.enabled then
 	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
@@ -223,15 +211,30 @@ end
 
 -- safe zones
 for z in all(zs) do
-	if z.shrinking then
+	if z.state=="idle" then
+		if touching(p,z) then
+			z.state="shrinking"
+		end
+	elseif z.state=="shrinking" then
 		z.t-=z.speed
-		if z.t<2 then
-			z.a=rnd(1) z.t=32
-			z.x=64+cos(z.a)*63 z.y=64+sin(z.a)*63
-			z.shrinking=false
+		if z.t<2 then 
+			z.state="moving"
+			z.start=z.a
+			z.dist=rnd(2)
+			z.mstart=tick
+			z.mdur=180
+		end
+	elseif z.state=="moving" then
+		local pct=min(1,(tick-z.mstart)/z.mdur)
+		if pct<1 then
+			pct=easeinoutquart(pct)
+			z.a=z.start+z.dist*pct
+			z.x,z.y=64+cos(z.a)*63,64+sin(z.a)*63
+		else
+			z.t=32
+			z.state="idle"
 		end
 	end
-	if touching(p,z) then z.shrinking=true end
 end
 
 --homing bomb move
@@ -289,7 +292,7 @@ if p.enabled then
 	local d=dist(p.x,p.y,64,64)
 	local vulnerable=true
 	for z in all(zs) do
-		if touching(p,z) then vulnerable=false break end
+		if z.state=="idle" and touching(p,z) then vulnerable=false break end
 	end
 	if vulnerable then
 		for l in all(lz) do
@@ -401,7 +404,7 @@ if #rs==0 and #fs==0 and p.enabled and state=="running" then
 	state="wiping"
 	extralives=mulligans
 	sfx(2,-2)
-	p.enabled=false
+--	p.enabled=false
 	p.thrusting=false
 	lvl+=1
 	if lvl>#lvls then lvl=1 end
@@ -439,6 +442,7 @@ end
 
 --safe zone
 for z in all(zs) do
+	if z.state=="idle" or z.state=="shrinking" then
 --	fillp(░)
 	fillp(32125)
 --	fillp(0b0101101001011010)
@@ -447,6 +451,8 @@ for z in all(zs) do
 	fillp()
 	circfill(z.x,z.y,z.r-z.t,0)
 	circ(z.x,z.y,z.r,1)
+		
+	end
 	spr(5,z.x-4,z.y-4)
 end
 
@@ -603,7 +609,7 @@ lvls={
 }
 
 function wipe_anim()
-	outer.enabled=false
+--	outer.enabled=false	
 	local start=tick
 	while tick-start<30 do
 		local pct=(tick-start)/30
@@ -612,12 +618,14 @@ function wipe_anim()
 		local r=inner.r+(63-inner.r)*pct
 		circfill(64,64,r,0)
 		circ(64,64,r,6)
+		outer.r=63+pct*50
 		yield()
 	end
 	circfill(64,64,63,0)
 	circ(64,64,63,6)
 	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={}
 	outer.enabled=true
+	outer.r=63
 	add(as,cocreate(spawn))
 end
 
@@ -657,6 +665,7 @@ function spawn()
 				z.a=rnd(1)
 				z.x=64+cos(z.a)*63
 				z.y=64+sin(z.a)*63
+				z.state="idle"
 				add(zs,z)
 				sfx(10)
 				break
@@ -880,6 +889,13 @@ function easeinexpo(x)
 	end
 end
 
+function easeinoutquart(x)
+	if x<.5 then
+		return 8 * x * x * x * x
+	end
+		return 1 - ((-2 * x + 2)^4) / 2
+--	return 1 - pow(-2 * x + 2, 4) / 2
+end
 --get random angle that is not within margin of given angle
 function aim_away(ang,margin)
 	local margin=margin or .25
@@ -1259,7 +1275,7 @@ fills={
 --		sspr(69,8,119,36,lft,18)
 --		fillp()
 		
-		circ(outer.x,outer.y,outer.r,6)
+--		circ(outer.x,outer.y,outer.r,6)
 		yield()
 	end
 	state="wipe"
