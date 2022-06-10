@@ -1201,81 +1201,38 @@ fills={
 
 	fin=1
 	local frate=.1
+	local scany=0
 	while c<30 or btn()==0 do
 		c+=1
-		t+=trate
---		fin=
-		fin+=frate
---		fin=flr(fin)%2
-		col1=8 col2=2
+--give the bomb something to chase
 		if rnd()>.9 then 
 			p.a,p.x,p.y=rnd(),64+cos(p.a)*63,64+sin(p.a)*63
 		end
 
-		local lft=64-25
---		local cs={8,8,8,8,8,2}
---		pal(1,rnd(cs))
---		pal(1,flr(rnd(16)))
---		pal(7,0)
---		pal(1,8)
---		sspr(69,8,119,36,64-25,18)
---		pal()
-		
---		pal(1,col1)
---		if t<50 then
---		clip(lft,0,t%50,128)			
---		end
---		sspr(69,8,119,36,64-25,18)
---		clip()
-
---		
---		pal(1,col1)
---		if (flr(t/50))%2==0 then
---		clip(lft,0,t%50,128)			
---		else
---		clip(lft+t%50,0,50,128)
---		end
---		sspr(69,8,119,36,64-25,18)
---		clip()	
---		pal()
-		
---		pal(1,col2)
---		clip(lft+c%50,0,50-c%50,128)
---		sspr(69,8,119,36,64-25,18)
---		clip()	
---		pal()
-
---		pal(1,col2)
---		if (flr(t/50))%2==1 then
---		clip(lft,0,t%50,128)			
---		else
---		clip(lft+t%50,0,50,128)
---		end
---		sspr(69,8,119,36,64-25,18)
---		clip()	
---		pal()
-
---		pal(7,0)
---		pal(1,8)
---		sspr(69,8,119,36,lft,18)
---		pal()
-
+--spritesheet coords
+		local sc={x=69,y=8,x2=119,y2=47}
+		sc.w,sc.h=sc.x2-sc.x+1,sc.y2-sc.y+1
+--	screen coords
+		local tc={x=39,y=18,w=sc.w,h=sc.h}
+	
 		pal(1,8)
 		pal(7,0)
-		sspr(69,8,119,40,64-25,18)
---		pal()
---		pal(7,8)		
---		fillp(fills[flr(fin)%4])	
---		sspr(69,8,119,36,64-25,18)
---		fillp()
---		pal()
-		
---		pal(1,0)
---		fillp(fills[1])
---		sspr(69,8,119,36,lft,18)
---		fillp()
-		
---		circ(outer.x,outer.y,outer.r,6)
+		sspr(sc.x,sc.y,sc.w,sc.h,tc.x,tc.y)
+
+--convert scany into oscillator so lines goes up and down
+		local os=sin(scany/100)*sc.h
+
+--scan line down the logotype
+		for x=1,sc.w do
+			if sget(sc.x+x,sc.y+os)==7 then
+				pset(tc.x+x,tc.y+os,8)				
+			end
+--			if sget(sc.x+x,sc.y+scany)==7 then
+--				pset(tc.x+x,tc.y+scany,8)				
+--			end
+		end		
+		scany+=1
+--		if scany>100 then scany=0 end
 		yield()
 	end
 	state="wipe"
