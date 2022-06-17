@@ -5,7 +5,9 @@ __lua__
 -- casey labrack
 
 -- todo:
---  selectable # of mulligans? (easy, normal...)
+--  doom-style avatar in corner
+--  zoids,flaurs,
+--  gamescreen shows bests score 
 --  timing or lap based enemy? (boss?)
 
 p = {x=80,y=30,dx=0,dy=0,
@@ -14,7 +16,12 @@ p = {x=80,y=30,dx=0,dy=0,
 					enabled=false,
 					thrusting=false,
 					gun=0,gunfull=120,gunfail=false,gunfailtick=0,
-					flipready=10,fliplast=0}
+					flipready=10,fliplast=0,}
+dmg={ 
+	{roid=2,flower=2,bomb=60},--easy
+	{roid=2,flower=2,bomb=60},--normal
+	{roid=1,flower=1,bomb=30},--hard
+}
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
@@ -28,6 +35,17 @@ outer = {x=64,y=64,r=63,enabled=true}
 lvl=1
 mulligans=1
 extralives=mulligans
+mulmsg={ --titlescreen mulligan description
+"(3 mulligans, 2x dmg)",
+"(1 mulligan, 2x dmg)",
+"(1 mulligan, 1x dmg)",
+}
+diffmsg={--titlescreen difficulty description
+"difficulty: relaxed",
+"difficulty: recommended",
+"difficulty: show-off",
+}
+difficulty=1--1 easy,2 med,3 hard
 tick=0
 state="title"
 cp=dp--current pallete
@@ -57,7 +75,7 @@ tips={
 	{"for safety in the tau,","ships fire only one","bullet at a time"},
 	{"very close range shots","= very fast rate of fire"},
 	{"quick flip (⬇️) is","faster than doing a 180"},
-	{"the tele takes a","while to charge","good thing you're","good at dodging"},
+	{"the tele takes a","while to charge.","good thing you're","good at dodging"},
 	{"some preferences","(screen shake toggle","and button swaps)","in the pause menu"},
 }
 
@@ -67,6 +85,8 @@ function _init()
 	fire_btn  = (not swapped) and ❎ or 🅾️ 
 	thrust_btn= (not swapped) and 🅾️ or ❎
 	screenshake=dget(1)==1
+	difficulty=dget(2)
+	difficulty=difficulty==0 and 2 or difficulty
 	title=cocreate(title_setup)
 	menuitem(1, "swap action btns", btns_toggle)
 	menuitem(2, "screenshake:"..(screenshake==1 and "on" or "off"), screenshake_toggle)
@@ -102,6 +122,7 @@ if state=="setup" or state=="wipe" then
 	return
 end
 
+--pauses most game logic for a number of frames
 if sleep>0 then
 	sleep-=1
 	return
@@ -384,7 +405,7 @@ if b.enabled then
 					b:splash()
 --					sfx(24)
 					sfx(21)
-					l.r-=2
+					l.r-=dmg[difficulty].flower
 					l.growcount=0
 					l.hit=tick
 					if l.r<3 then
@@ -402,7 +423,7 @@ if b.enabled then
 				b:splash()
 				sfx(21)
 				local oldr=v.r
-				v.r-=2
+				v.r-=dmg[difficulty].roid
 				v.hit=tick
 				if v.r<3 then	
 					shake+=1.1
@@ -420,7 +441,7 @@ if b.enabled then
 				b:splash()
 --				sfx(21)
 				h.enabled=false
-				h.timer=60
+				h.timer=dmg[difficulty].bomb
 				h.dx+=b.dx/4	h.dy+=b.dy/4
 				goto donebullet
 			end
@@ -663,6 +684,7 @@ function wipe_anim()
 --	outer.enabled=false	
 	local start=tick
 	while tick-start<30 do
+		if tick-start==15 then p.enabled=false end
 		local pct=(tick-start)/30
 --		pct=easeoutexpo(pct)
 		pct=easeinexpo(pct)
@@ -907,7 +929,7 @@ function touching(a,b)
 	return distt(a,b)<a.r+b.r
 end
 
---what array elements satisfy predicate function
+--what array elements satisfy predicate function?
 function filter(f,t)
 	local r={}
 	for _,v in ipairs(t) do
@@ -916,7 +938,7 @@ function filter(f,t)
 	return r
 end
 
---do all array elements satisfy predicate function
+--do all array elements satisfy predicate function?
 function allt(f,t)
 	for _,v in ipairs(t) do
 		if not f(v) then return false end
@@ -945,8 +967,8 @@ function easeinoutquart(x)
 		return 8 * x * x * x * x
 	end
 		return 1 - ((-2 * x + 2)^4) / 2
---	return 1 - pow(-2 * x + 2, 4) / 2
 end
+
 --get random angle that is not within margin of given angle
 function aim_away(ang,margin)
 	local margin=margin or .25
@@ -977,6 +999,17 @@ function circle(x,y,r,c)
 	  xo+=1
 	until xo>yo
 end
+ 	
+--https://www.lexaloffle.com/bbs/?pid=88836#p
+function smallcaps(s)
+  local t=""
+  for i=1,#s do
+    local c=ord(s,i)
+    t..=chr(c>96 and c<123 and c-32 or c)
+  end
+  return t
+end
+
 -->8
 --palletes
 dp={ --default palette
@@ -1242,7 +1275,9 @@ fills={
 	local col2={1,2,8,14}
 	local frate=.1
 	local scany=0
-	while c<30 or btn()==0 do
+	local dd=10--sleep input
+	local haspressed=false
+	while c<30 or not ((btn(❎) or btn(🅾️)) and haspressed) do
 		c+=1
 --give the bomb something to chase
 		if rnd()>.9 then 
@@ -1276,8 +1311,49 @@ fills={
 		end		
 		scany+=1
 --		if scany>100 then scany=0 end
+
+		--difficulty choose
+		if haspressed then
+			dd-=1
+			if btn()==0 then dd=-1 end
+			if dd<0 then
+				if btn(⬅️) or btn(⬇️) then 
+					difficulty=mid(1,difficulty-1,3)
+					dd=10
+				end
+				if btn(➡️) or btn(⬆️) then
+					difficulty=mid(1,difficulty+1,3)
+					dd=10
+				end
+			end
+			
+			local xoff,yoff,w,h=14,76,98,20
+			for x=1,w do
+				for y=1,h do
+					if pget(x+xoff,y+yoff)~=0 then
+						pset(x+xoff,y+yoff,1)
+					end
+				end
+			end
+
+			rect(xoff,yoff,xoff+w,yoff+h,1)
+			cprint(diffmsg[difficulty],64,80,7)
+			cprint(mulmsg[difficulty],64,88,7)
+		end
+		
+		if btn()~=0 and not haspressed then
+			haspressed=true
+			c=10	
+		end
+		
+		color(1)
+		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
+		print("l"..smallcaps("abrack"),100,122)
 		yield()
 	end
+	dset(2,difficulty)
+	mulligans=difficulty==1 and 3 or 1
+	extralives=mulligans
 	state="wipe"
 	wipe=cocreate(wipe_anim)
 end
