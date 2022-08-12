@@ -5,13 +5,15 @@ __lua__
 -- casey labrack
 
 -- todo:
---  death particles time out, foreground
+--  boss fight
+--  tau 0
+--  sensitivity adjust
+--  death replays
 --  doom-style avatar in corner
 --  zoids,flaurs,
 --  gamescreen shows bests score 
---  timing or lap based enemy? (boss?)
 
-version=28
+version=29
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,friction=.92,
 					hop=25,charge=0,fullcharge=230,
@@ -32,6 +34,9 @@ a2= {} --animations in draw phase
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false,parts={}}
+boss = {enabled=false,hp=360,eye={x=64,y=64},lasthit=-100,
+								lastspawn=120,spawni=720,
+								shiftcount=30,floor={x=64,y=64,r=24}}
 inner = {x=64,y=64,r=6}
 outer = {x=64,y=64,r=63,enabled=true}
 lvl=1
@@ -44,8 +49,8 @@ mulmsg={ --titlescreen mulligan description
 "(0 mulligans, 1x dmg)",
 }
 diffmsg={--titlescreen difficulty description
-"difficulty: newcomer",
-"difficulty: recommended",
+"difficulty: ease",
+"difficulty: challenge",
 "difficulty: prestige",
 }
 difficulty=1--1 easy,2 med,3 hard
@@ -62,6 +67,7 @@ wipe=nil
 blink=nil
 title=nil
 dethmsg=nil
+dethparts=nil
 log=""
 
 dethmsgs={
@@ -70,7 +76,7 @@ dethmsgs={
 "mistakes were made",
 "testing ejector seat",
 "tax write-off",
-"oopsie-doopsie",
+"had an oopsie-doopsie",
 }
 
 tips={
@@ -131,6 +137,36 @@ end
 if sleep>0 then
 	sleep-=1
 	return
+end
+
+if boss.enabled then
+	local pa=atan2(64-p.x,64-p.y)---.5
+	boss.eye.x=64+cos(pa)*4
+	boss.eye.y=64+sin(pa)*4
+	boss.shiftcount-=1
+	if boss.shiftcount<0 then
+		boss.shiftcount=20+rnd()*40
+		local shift=rnd(boss.bulges)
+		local m=2
+		shift.x+=-m+rnd()*m*2
+		shift.y+=-m+rnd()*m*2
+	end
+	boss.lastspawn-=1
+	if boss.lastspawn<0 then
+		boss.lastspawn=boss.spawni
+		for i=1,6 do
+			local r={}
+			local a=pa+.5
+			r.x=64+cos(a)*8 r.y=64+sin(a)*8
+			local spd=rnd(1.25)+.5
+			a=a+rndr(-.2,.2)
+			r.dx=cos(a)*spd r.dy=sin(a)*spd
+			r.r=3+rnd(8-3) r.enabled=true
+			r.hit=-10
+			add(rs,r)			
+		end
+	end
+	log=boss.hp
 end
 
 if p.enabled then
@@ -359,6 +395,12 @@ if p.enabled then
 	for h in all(hs) do
 		if (touching(p,h)) died(h)
 	end
+	
+	if boss.enabled then
+		if touching(p,boss.floor) then
+			died(boss)
+		end
+	end
 end
 
 --laser/player collision
@@ -472,6 +514,15 @@ if b.enabled then
 				goto donebullet
 			end
 		end
+		for bulge in all(boss.bulges) do
+			if touching(bulge,b) then
+				boss.hp-=1
+				boss.lasthit=tick
+				b.enabled=false
+				b:splash()
+				goto donebullet
+			end			
+		end
 		if touching(inner,b) or distt(inner,b)>63 then
 			b.enabled=false sfx(20,-2)
 			b:splash()
@@ -484,11 +535,11 @@ end
 ::donebullet::
 
 --level win
-if #rs==0 and #fs==0 and p.enabled and state=="running" then
+if #rs==0 and #fs==0 and p.enabled and boss.enabled==false and state=="running" then
 	state="wiping"
+	dset(3,1) -- has beaten a level
 	extralives=mulligans
 	sfx(2,-2)
---	p.enabled=false
 	p.thrusting=false
 	lvl+=1
 	if lvl>#lvls then lvl=1 end
@@ -504,9 +555,8 @@ function died(cause)
 	shake+=4
 	p.enabled=false
 	p.thrusting=false
-	local d=cocreate(deathparticles)
-	coresume(d,cause)
-	add(a2,d)
+	dethparts=cocreate(deathparticles)
+	coresume(dethparts,cause)
 	extralives-=1
 	state="death"
 	local a=cocreate(death)
@@ -626,6 +676,7 @@ if p.enabled then
 	end
 end
 
+if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
 if blink and costatus(blink)~="dead" then coresume(blink) end
 
 -- roids
@@ -637,6 +688,29 @@ for v in all(rs) do
 	local y=v.y+sin(a)*v.r
 	local m=dist(0,0,v.dx,v.dy)*3
 	line(x,y,x+cos(a)*m,y+sin(a)*m)
+end
+
+--boss
+if boss.enabled then
+	fillp(ˇ)
+	circfill(boss.floor.x,boss.floor.y,boss.floor.r,11)
+	fillp()
+	local c=9
+	if tick-boss.lasthit<10 then
+		c=7
+	end
+	circfill(64,64,10,0)
+
+	for bulge in all(boss.bulges) do
+		circfill(bulge.x,bulge.y,bulge.r,0)
+		circ(bulge.x,bulge.y,bulge.r,c)
+	end
+
+	circfill(64,64,10,0)
+	
+	circfill(boss.eye.x,boss.eye.y,8,0)
+	circ(boss.eye.x,boss.eye.y,8,c)
+	spr(2,boss.eye.x-2,boss.eye.y-2)
 end
 
 --bullet
@@ -711,15 +785,19 @@ end
 lvls={
 --	{roids=5},
 --	{flowers=1,lasers=1,safezone=true},
-	{roids=4,lasers=1},
-	{roids=6,lasers=1,safezone=true},
-	{roids=4,lasers=1,flowers=2},
-	{roids=5,lasers=1,flowers=3},
-	{roids=6,lasers=1,flowers=4,safezone=true},
-	{roids=4,bomb=true},
-	{roids=4,flowers=3,bomb=true},
-	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},
-	{roids=10,lasers=2,safezone=true},
+	{roids=4,lasers=1},--1
+	{roids=6,lasers=1,safezone=true},--2
+	{roids=4,lasers=1,flowers=2},--3
+	{roids=5,lasers=1,flowers=3},--4
+	{roids=6,lasers=1,flowers=4,safezone=true},--5
+	{roids=4,bomb=true},--6
+	{roids=4,flowers=3,bomb=true},--7
+	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},--8
+	{roids=6,lasers=2},--9
+	{roids=8,lasers=2,safezone=true},--10
+	{roids=6,lasers=2,flowers=2,safezone=true},--11
+	{boss=1,lasers=3,safezone=true} --12
+--	{boss=1} --12
 }
 
 function wipe_anim()
@@ -739,6 +817,7 @@ function wipe_anim()
 	circfill(64,64,63,0)
 	circ(64,64,63,6)
 	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={}
+	boss.enabled=false
 	outer.enabled=true
 	outer.r=63
 	add(as,cocreate(spawn))
@@ -822,6 +901,21 @@ function spawn()
 				sfx(8)
 				if #fs==num then break end
 			end
+			if unit=="boss" then
+				boss.enabled=true
+				boss.bulges={}
+				for i=1,6 do
+					local b={}
+					local a=i/6
+					local r=8+rnd()*6
+					b.x=64+cos(a)*r
+					b.y=64+sin(a)*r
+					b.r=5+rnd()*5
+					add(boss.bulges,b)
+				end
+				sfx(8)
+				break
+			end
 			c=i
 			::continue::
 			yield()
@@ -844,7 +938,7 @@ function death(delay,duration)
 		cp=bwp[ceil(pct*#bwp)]
 		yield()
 	end
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={}
+	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={} boss.enabled=false
 	start=tick
 	state="dead"
 	if extralives<0 then
@@ -943,10 +1037,10 @@ function deathmsg_anim()
 	local msg=rnd(dethmsgs)
 	local ypos=62
 	while true do
-		cprint("craft destroyed. pilot notes:", 64, ypos-8,6)
-		cprint("\""..msg.."\"",64,ypos,7)
+		cprint("craft destroyed. pilot notes:", 64, ypos-8,7)
+		cprint("\""..msg.."\"",64,ypos,6)
 		local mulls=extralives==1 and " mulligan" or " mulligans"
-		cprint(""..extralives..mulls.." left this tau",64,ypos+12,6)
+		cprint(""..extralives..mulls.." left this tau",64,ypos+12,7)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
 				if tick%20>10 then
