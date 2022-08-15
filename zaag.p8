@@ -5,15 +5,16 @@ __lua__
 -- casey labrack
 
 -- todo:
---  boss fight
+--  boss fight. lazy follow. bob. charge states.
 --  tau 0
+--  cleanse/purge the tau. pilot notes: mission success
 --  sensitivity adjust
 --  death replays
 --  doom-style avatar in corner
 --  zoids,flaurs,
 --  gamescreen shows bests score 
 
-version=29
+version=30
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,friction=.92,
 					hop=25,charge=0,fullcharge=230,
@@ -22,10 +23,11 @@ p = {x=80,y=30,dx=0,dy=0,
 					gun=0,gunfull=120,gunfail=false,gunfailtick=0,
 					flipready=10,fliplast=0,}
 dmg={ 
-	{roid=2,flower=2,bomb=60},--easy
-	{roid=1.5,flower=1.5,bomb=45},--normal
-	{roid=1,flower=1,bomb=30},--hard
+	{roid=2,flower=2,bomb=60,boss=4},--easy
+	{roid=1.5,flower=1.5,bomb=45,boss=3},--normal
+	{roid=1,flower=1,bomb=30,boss=2},--hard
 }
+laserspeeds={.005,.004,.003}
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
@@ -34,10 +36,13 @@ a2= {} --animations in draw phase
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false,parts={}}
-boss = {enabled=false,hp=360,eye={x=64,y=64},lasthit=-100,
-								lastspawn=120,spawni=720,
-								shiftcount=30,floor={x=64,y=64,r=24}}
-inner = {x=64,y=64,r=6}
+boss = {enabled=false,startinghp=360,hp=360,
+								eye={x=64,y=64,r=8,fx=64,fy=64,phase=.7,reach=10},lasthit=-100,
+								spawnnum=6,
+								state="spawn",start=0,
+								growdur=90,warndur=30,
+								floor={x=64,y=64,r=18}}
+inner = {x=64,y=64,r=6,enabled=true}
 outer = {x=64,y=64,r=63,enabled=true}
 lvl=1
 mulligans=1
@@ -77,6 +82,8 @@ dethmsgs={
 "testing ejector seat",
 "tax write-off",
 "had an oopsie-doopsie",
+"no one is perfect",
+--"time to look forward not back",
 }
 
 tips={
@@ -140,32 +147,70 @@ if sleep>0 then
 end
 
 if boss.enabled then
-	local pa=atan2(64-p.x,64-p.y)---.5
-	boss.eye.x=64+cos(pa)*4
-	boss.eye.y=64+sin(pa)*4
-	boss.shiftcount-=1
-	if boss.shiftcount<0 then
-		boss.shiftcount=20+rnd()*40
-		local shift=rnd(boss.bulges)
-		local m=2
-		shift.x+=-m+rnd()*m*2
-		shift.y+=-m+rnd()*m*2
-	end
-	boss.lastspawn-=1
-	if boss.lastspawn<0 then
-		boss.lastspawn=boss.spawni
-		for i=1,6 do
-			local r={}
-			local a=pa+.5
-			r.x=64+cos(a)*8 r.y=64+sin(a)*8
-			local spd=rnd(1.25)+.5
-			a=a+rndr(-.2,.2)
-			r.dx=cos(a)*spd r.dy=sin(a)*spd
-			r.r=3+rnd(8-3) r.enabled=true
-			r.hit=-10
-			add(rs,r)			
+	local towardplayer=atan2(p.x-64,p.y-64)
+	--boss attack
+	if boss.state=="spawn" then
+		if #boss.bulges<boss.spawnnum then
+			local b={}
+			b.r=0
+			b.finalr=5+rnd()*5
+			local a=rnd()
+			b.x=64+cos(a)*8
+			b.y=64+sin(a)*8
+			b.tx,b.ty=b.x,b.y --target position it can vibrate around
+			add(boss.bulges,b)
+			boss.state="grow"
+			boss.start=0
+		else
+			boss.state="warn"
+			boss.start=0
 		end
+	elseif boss.state=="grow" then
+		if boss.start<boss.growdur then
+			boss.start+=1
+			local pct=boss.start/boss.growdur
+			local spawnling=boss.bulges[#boss.bulges]
+			spawnling.r=pct*spawnling.finalr
+		else
+			boss.state="spawn"
+		end
+	elseif boss.state=="warn" then
+		if boss.start<boss.warndur then
+			boss.start+=1
+			local pct=boss.start/boss.warndur
+			for bulge in all(boss.bulges) do
+				local a,d=rnd(),pct*3
+				bulge.x=bulge.tx+cos(a)*d
+				bulge.y=bulge.ty+sin(a)*d
+			end
+		else
+			boss.state="fire"
+		end
+	elseif boss.state=="fire" then
+		for bulge in all(boss.bulges) do
+			local r={}
+			r.x=bulge.tx r.y=bulge.ty
+			local spd=rnd(1.25)+.5
+			local a=towardplayer+rndr(-.1,.1)
+			r.dx=cos(a)*spd r.dy=sin(a)*spd
+			r.r=bulge.r r.enabled=true
+			r.hit=-10
+			add(rs,r)
+			boss.bulges={}	
+		end
+		boss.state="spawn"
 	end
+	--boss eye
+		--lazy follow
+	local rx,ry=64+cos(towardplayer)*boss.eye.reach,64+sin(towardplayer)*boss.eye.reach
+	local dx,dy=rx-boss.eye.fx,ry-boss.eye.fy
+	dx*=.05 dy*=.05
+	boss.eye.fx+=dx boss.eye.fy+=dy
+		--bob around
+	local modx=cos(t()/2+boss.eye.phase)*3
+	local mody=cos(t()/3)*3
+		--final pos	
+	boss.eye.x=boss.eye.fx+modx boss.eye.y=boss.eye.fy+mody
 	log=boss.hp
 end
 
@@ -396,6 +441,7 @@ if p.enabled then
 		if (touching(p,h)) died(h)
 	end
 	
+	--player vs. boss
 	if boss.enabled then
 		if touching(p,boss.floor) then
 			died(boss)
@@ -435,7 +481,7 @@ for v in all(rs) do
 		v.dx=cos(def)*mag
 		v.dy=sin(def)*mag
 	end
-	if dist(v.x,v.y,64,64)<4+v.r then
+	if dist(v.x,v.y,64,64)<4+v.r and inner.enabled then
 		local a=atan2(v.x-64,v.y-64)
 		local x=64+cos(a)*(4+v.r)
 		local y=64+sin(a)*(4+v.r)
@@ -514,15 +560,13 @@ if b.enabled then
 				goto donebullet
 			end
 		end
-		for bulge in all(boss.bulges) do
-			if touching(bulge,b) then
-				boss.hp-=1
-				boss.lasthit=tick
-				b.enabled=false
-				b:splash()
-				goto donebullet
-			end			
-		end
+		if boss.enabled and touching(boss.eye,b) then
+			boss.hp-=dmg[difficulty].boss
+			boss.lasthit=tick
+			b.enabled=false
+			b:splash()
+			goto donebullet
+		end			
 		if touching(inner,b) or distt(inner,b)>63 then
 			b.enabled=false sfx(20,-2)
 			b:splash()
@@ -695,21 +739,18 @@ if boss.enabled then
 	fillp(ˇ)
 	circfill(boss.floor.x,boss.floor.y,boss.floor.r,11)
 	fillp()
+	circfill(64,64,inner.r,0)
+
 	local c=9
-	if tick-boss.lasthit<10 then
-		c=7
-	end
-	circfill(64,64,10,0)
+	if tick-boss.lasthit<10 then c=7 end
 
 	for bulge in all(boss.bulges) do
 		circfill(bulge.x,bulge.y,bulge.r,0)
-		circ(bulge.x,bulge.y,bulge.r,c)
+		circ(bulge.x,bulge.y,bulge.r,9)
 	end
-
-	circfill(64,64,10,0)
 	
-	circfill(boss.eye.x,boss.eye.y,8,0)
-	circ(boss.eye.x,boss.eye.y,8,c)
+	circfill(boss.eye.x,boss.eye.y,boss.eye.r,0)
+	circ(boss.eye.x,boss.eye.y,boss.eye.r,c)
 	spr(2,boss.eye.x-2,boss.eye.y-2)
 end
 
@@ -832,7 +873,7 @@ function spawn()
 	add(a2,enteranim)
 	while c>0 do c-=1 yield() end
 	p.enabled=true
-
+	inner.enabled=true
 	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
 		c=i --countdown spawn interval
@@ -871,7 +912,7 @@ function spawn()
 			end
 			if unit=="lasers" then
 				local a=(1/num)*#lz+.1
-				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
+				add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=laserspeeds[num],parts={index=0}})
 				sfx(7)
 				if #lz==num then break end
 			end
@@ -904,15 +945,10 @@ function spawn()
 			if unit=="boss" then
 				boss.enabled=true
 				boss.bulges={}
-				for i=1,6 do
-					local b={}
-					local a=i/6
-					local r=8+rnd()*6
-					b.x=64+cos(a)*r
-					b.y=64+sin(a)*r
-					b.r=5+rnd()*5
-					add(boss.bulges,b)
-				end
+				inner.enabled=false
+				boss.hp=boss.startinghp
+				boss.state="spawn"
+				boss.start=0
 				sfx(8)
 				break
 			end
