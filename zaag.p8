@@ -1,19 +1,18 @@
 pico-8 cartridge // http://www.pico-8.com
-version 33
+version 36
 __lua__
 -- zaag
 -- casey labrack
 
 -- todo:
---  more sounds
+--  boss intro and outro
 --  gamewin screen.pilot notes: mission success
---  sensitivity adjust
+--  more sounds esp level transition
 --  death replays
---  doom-style avatar in corner
---  zoids,flaurs,
---  gamescreen shows bests score 
+--  sensitivity adjust
 
-version=31
+version=32
+--p = {x=80,y=30,dx=0,dy=0,
 p = {x=80,y=30,dx=0,dy=0,
 					a=.75,t=.25,rt=.05,r=3,friction=.92,
 					hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
@@ -34,11 +33,10 @@ a2= {} --animations in draw phase
 fs= {} --flowers
 rs= {} --roids
 b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false,parts={}}
-boss = {enabled=false,startinghp=360,hp=360,
-								eye={x=64,y=64,r=10,fx=64,fy=64,phase=.7,reach=7},lasthit=-100,
-								spawnnum=3,
-								state="spawn",start=0,
-								growdur=80,warndur=30,
+boss = {enabled=false,
+								r=3,steadyx=64,steadyy=64,lasthit=-100,
+								spawnnum=3,finalsize=10,
+								growdur=80,
 								floor={x=64,y=64,r=18}}
 inner = {x=64,y=64,r=6,enabled=true}
 outer = {x=64,y=64,r=63,enabled=true}
@@ -71,6 +69,7 @@ blink=nil
 title=nil
 dethmsg=nil
 dethparts=nil
+gamewon=nil
 log=""
 
 dethmsgs={
@@ -99,6 +98,7 @@ tips={
 }
 
 function _init()
+--	music(8)
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
 	fire_btn  = (not swapped) and ❎ or 🅾️ 
@@ -137,7 +137,7 @@ for a in all(as) do
 	else del(as,a) end
 end
 
-if state=="setup" or state=="wipe" then
+if state=="setup" or state=="wipe" or state=="win" then
 	return
 end
 
@@ -176,43 +176,49 @@ if boss.enabled then
 			boss.state="spawn"
 		end
 	elseif boss.state=="warn" then
-		if boss.start<boss.warndur then
+		if boss.start<30 then
 			boss.start+=1
-			local pct=boss.start/boss.warndur
+			local pct=boss.start/30
 			for bulge in all(boss.bulges) do
 				local a,d=rnd(),pct*3
-				bulge.x=bulge.tx+cos(a)*d
-				bulge.y=bulge.ty+sin(a)*d
+				bulge.x,bulge.y=bulge.tx+cos(a)*d,bulge.ty+sin(a)*d
 			end
 		else
 			boss.state="fire"
 		end
 	elseif boss.state=="fire" then
 		for bulge in all(boss.bulges) do
-			local r={}
-			r.x=bulge.tx r.y=bulge.ty
 			local spd=rnd(1.25)+.5
 			local a=towardplayer+rndr(-.1,.1)
-			r.dx=cos(a)*spd r.dy=sin(a)*spd
-			r.r=bulge.r r.enabled=true
-			r.hit=-10
-			add(rs,r)
+			add(rs,{x=bulge.tx,y=bulge.ty,
+											dx=cos(a)*spd,dy=sin(a)*spd,
+											r=bulge.r,enabled=true,hit=-10})
 			boss.bulges={}	
 		end
 		boss.state="spawn"
+	elseif boss.state=="intro" then
+		if boss.start<60 then
+			boss.start+=1
+			boss.r=boss.finalsize*boss.start/60
+		else
+			boss.state="spawn"
+			boss.start=0
+		end
 	end
 	--boss eye
 		--lazy follow
-	local rx,ry=64+cos(towardplayer)*boss.eye.reach,64+sin(towardplayer)*boss.eye.reach
-	local dx,dy=rx-boss.eye.fx,ry-boss.eye.fy
-	dx*=.05 dy*=.05
-	boss.eye.fx+=dx boss.eye.fy+=dy
-		--bob around
-	local modx=cos(t()/2+boss.eye.phase)*3
-	local mody=cos(t()/3)*3
-		--final pos	
-	boss.eye.x=boss.eye.fx+modx boss.eye.y=boss.eye.fy+mody
-	log=boss.hp
+	if boss.state~="intro" then
+		local rx,ry=64+cos(towardplayer)*7,64+sin(towardplayer)*7
+		local dx,dy=rx-boss.steadyx,ry-boss.steadyy
+		dx*=.05 dy*=.05
+		boss.steadyx+=dx boss.steadyy+=dy
+			--bob around
+		local modx=cos(t()/2+.7)*3
+		local mody=cos(t()/3)*3
+			--final pos	
+		boss.x,boss.y=boss.steadyx+modx,boss.steadyy+mody
+	end
+		log=boss.hp
 end
 
 if p.enabled then
@@ -239,14 +245,13 @@ if p.enabled then
 	if btn(⬆️) then
 	 if p.charge>p.fullcharge then
 			local x1,y1=p.x,p.y
-			local dur=8
 			p.x+=cos(p.a)*p.hop
 			p.y+=sin(p.a)*p.hop
 			p.thrusting=false
 			blink=cocreate(blink_anim)
-			coresume(blink,x1,y1,p.x,p.y,dur)
+			coresume(blink,x1,y1,p.x,p.y)
 			p.charge=0
-			sleep=dur
+			sleep=8
 			sfx(22)
 		else
 			if tick-p.hopfailtick>2 then
@@ -272,8 +277,8 @@ if p.enabled then
 		end
 	end
 end
-p.x=p.x+p.dx
-p.y=p.y+p.dy
+p.x+=p.dx
+p.y+=p.dy
 p.dx*=p.friction
 p.dy*=p.friction
 
@@ -342,7 +347,7 @@ for l in all(lz) do
 		local diff=sad(atosafe,l.a)
 		
 		-- hit safezone instead
-		if abs(diff)<s.arc then 
+		if abs(diff)<30 then 
 			local flag=10
 			circ(s.x,s.y,s.r,flag)
 			circfill(s.x,s.y,s.r,flag)			
@@ -381,7 +386,7 @@ for z in all(zs) do
 			z.state="shrinking"
 		end
 	elseif z.state=="shrinking" then
-		z.t-=z.speed
+		z.t-=.25
 		if z.t<2 then 
 			z.state="moving"
 			z.start=z.a
@@ -428,15 +433,13 @@ end
 local ang=atan2(p.x-64,p.y-64)
 
 -- player vs outside wall
-if dist(p.x,p.y,64,64) > 63 then
-	p.x=64+cos(ang)*63
-	p.y=64+sin(ang)*63
+if dist(p.x,p.y,64,64)>63 then
+	p.x,p.y=64+cos(ang)*63,64+sin(ang)*63
 end
 
 -- player vs inside wall
 if touching(inner,p) then
-	p.x=64+cos(ang)*8
-	p.y=64+sin(ang)*8
+	p.x,p.y=64+cos(ang)*8,64+sin(ang)*8
 end
 
 if p.enabled then
@@ -451,10 +454,8 @@ if p.enabled then
 	end
 	
 	--player vs. boss
-	if boss.enabled then
-		if touching(p,boss.floor) then
+	if boss.enabled and touching(p,boss.floor) then
 			died(boss)
-		end
 	end
 end
 
@@ -484,22 +485,14 @@ for v in all(rs) do
 		local x=64+cos(a)*63
 		local y=64+sin(a)*63
 		v.x=x v.y=y
-		local inc=atan2(v.dx,v.dy)+.5 --incidence
-		local def=a+a-inc
-		local mag=dist(0,0,v.dx,v.dy)
-		v.dx=cos(def)*mag
-		v.dy=sin(def)*mag
+		deflect(v,a)
 	end
 	if dist(v.x,v.y,64,64)<4+v.r and inner.enabled then
 		local a=atan2(v.x-64,v.y-64)
 		local x=64+cos(a)*(4+v.r)
 		local y=64+sin(a)*(4+v.r)
 		v.x=x v.y=y
-		local inc=atan2(v.dx,v.dy)+.5 --incidence
-		local def=a+a-inc
-		local mag=dist(0,0,v.dx,v.dy)
-		v.dx=cos(def)*mag
-		v.dy=sin(def)*mag
+		deflect(v,a)
 	end
 	::continue::
 end
@@ -569,7 +562,7 @@ if b.enabled then
 				goto donebullet
 			end
 		end
-		if boss.enabled and touching(boss.eye,b) then
+		if boss.enabled and touching(boss,b) then
 			boss.hp-=dmg[difficulty].boss
 			boss.lasthit=tick
 			b.enabled=false
@@ -599,6 +592,15 @@ if #rs==0 and #fs==0 and p.enabled and boss.enabled==false and state=="running" 
 	wipe=cocreate(wipe_anim)
 	state="wipe"
 end
+
+-- game win
+if boss.enabled and state~="win" and boss.hp<0 then
+	state="win"
+	local a=cocreate(gamewin_anim)
+	coresume(a)
+	add(a2,a)
+end
+
 end
 
 function died(cause)
@@ -682,7 +684,7 @@ sspr(64,64,64,64,64,0,64,64,false,true)
 sspr(64,64,64,64,0,0,64,64,true,true)
 sspr(64,64,64,64,0,64,64,64,true,false)
 palt()
-pal()
+pal(cp)
 
 --safezone bot
 for z in all(zs) do
@@ -721,7 +723,7 @@ for f in all(fs) do
 end
 
 --emitter
-if state~="dead" then
+if state~="dead" and inner.enabled then
 	circfill(64,64,inner.r,0)
 	circ(64,64,inner.r,6)
 end
@@ -746,9 +748,6 @@ if p.enabled then
 	end
 end
 
-if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
-if blink and costatus(blink)~="dead" then coresume(blink) end
-
 -- roids
 for v in all(rs) do
 	circ(v.x,v.y,v.r,tick-v.hit>2 and 9 or 7)
@@ -767,22 +766,48 @@ if boss.enabled then
 	fillp()
 	circfill(64,64,inner.r,0)
 
-	local c=14
-	if tick-boss.lasthit<10 then c=7 end
+	local c=tick-boss.lasthit<10 and 7 or 14
+--	local c=14
+--	if tick-boss.lasthit<10 then c=7 end
 
 	for bulge in all(boss.bulges) do
 		circfill(bulge.x,bulge.y,bulge.r,0)
 		circ(bulge.x,bulge.y,bulge.r,9)
 	end
-	local a=atan2(boss.eye.x-64,boss.eye.y-64)
-	circfill(boss.eye.x,boss.eye.y,boss.eye.r,0)
-	circ(boss.eye.x,boss.eye.y,boss.eye.r,c)
-	if tick-boss.lasthit<10 then 
-		spr(36,boss.eye.x-3+cos(a)*4,boss.eye.y-3+sin(a)*4)
-	else
-		circ(boss.eye.x+cos(a)*2,boss.eye.y+sin(a)*2,boss.eye.r-2,c)
-		spr(20,boss.eye.x-3+cos(a)*5,boss.eye.y-3+sin(a)*5)
+	if boss.state=="intro" then
+		local pct=boss.start/60
+		if pct<.3 then 
+			pal(14,1)
+--			pal({[14]=1,[8]=2}) 
+		end
+		if pct<.6 then 
+			pal(14,2)
+--			pal({[14]=2,[8]=14}) 
+		end
 	end
+	local a=atan2(boss.x-64,boss.y-64)
+	local top=atan2(boss.x-p.x,boss.y-p.y)
+	circfill(boss.x,boss.y,boss.r,0)
+	circ(boss.x,boss.y,boss.r,c)
+	if tick-boss.lasthit<10 then
+		spr(2,boss.x-3+cos(a)*5,boss.y-3+sin(a)*5) 
+--		spr(36,boss.x-3+cos(a)*4,boss.y-3+sin(a)*4)
+--		sspr(40,16,56-40,32-16,boss.x-5,boss.y-5)
+	else
+		circ(boss.x+cos(a)*2,boss.y+sin(a)*2,boss.r-2,c)
+		if boss.r<boss.finalsize then
+			circ(64,64,boss.r/boss.finalsize*3,8)
+--			circ()
+		else
+			spr(20,boss.x-3+cos(a)*5,boss.y-3+sin(a)*5)
+		end
+--		if boss.r<8 then
+--			spr(2,boss.x-3+cos(a)*5,boss.y-3+sin(a)*5)
+--		else
+--			spr(20,boss.x-3+cos(a)*5,boss.y-3+sin(a)*5)
+--		end
+	end
+	pal(cp)
 end
 
 --bullet
@@ -795,6 +820,8 @@ for bp in all(b.parts) do
 end
 
 if wipe and costatus(wipe)~="dead" then coresume(wipe) end
+if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
+if blink and costatus(blink)~="dead" then coresume(blink) end
 
 pal()
 
@@ -842,12 +869,8 @@ end
 
 --print(stat(1),0,120,7)
 
-if state=="death" then
-	if outer.enabled then
---	circ(outer.x,outer.y,outer.r,6)
+if state=="death" and outer.enabled then
 	circle(outer.x,outer.y,outer.r,6)
-end
-
 end
 
 if title and costatus(title)~="dead" then coresume(title) end
@@ -889,7 +912,7 @@ function wipe_anim()
 	end
 	circfill(64,64,63,0)
 	circ(64,64,63,6)
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={}
+	clearlevel()
 	boss.enabled=false
 	outer.enabled=true
 	outer.r=63
@@ -928,17 +951,9 @@ function spawn()
 				if #rs==num then break end
 			end
 			if unit=="safezone" then
-				local z = {a=0,r=32,x=0,y=0,t=32,shrinking=false,speed=.25}
-				z.a=rnd(1)
-				z.x=64+cos(z.a)*63
-				z.y=64+sin(z.a)*63
-				z.state="moving"
-				z.mstart=tick
-				z.mdur=180
-				z.dist=rnd(1)
-				z.start=z.a
-				z.arc=30
-				add(zs,z)
+				local a=rnd()
+				add(zs,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,r=32,
+											state="moving",mstart=tick,mdur=180,dist=rnd(),start=a})
 				sfx(10)
 				break
 			end
@@ -961,7 +976,7 @@ function spawn()
 			if unit=="flowers" then
 				local f={}
 				f.tick=flr(rnd(10))
-				f.max=12
+				f.max=9
 				f.growgoal=30 --grow rate
 				f.br=250 --bud rate
 				local r={}
@@ -978,8 +993,8 @@ function spawn()
 				boss.enabled=true
 				boss.bulges={}
 				inner.enabled=false
-				boss.hp=boss.startinghp
-				boss.state="spawn"
+				boss.x,boss.y,boss.r,boss.hp=64,64,0,360
+				boss.state="intro"
 				boss.start=0
 				sfx(8)
 				break
@@ -1006,7 +1021,7 @@ function death(delay,duration)
 		cp=bwp[ceil(pct*#bwp)]
 		yield()
 	end
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={} boss.enabled=false
+	clearlevel()
 	start=tick
 	state="dead"
 	if extralives<0 then
@@ -1041,8 +1056,6 @@ function death(delay,duration)
 end
 
 function gameover()
-	local wid=print("gameover",129,0)-129
-	print("gameover",64-wid/2,64-10)
 	local start=tick
 	local c=0
 	local tw=60--trackwidth
@@ -1078,10 +1091,10 @@ function gameover()
 --	local tip=tips[ceil(rnd(#tips))]
 	while true do
 		c+=1
-		print("gameover",64-wid/2,64-4)
+		cprint("gameover",64,64-4,7)
 
 		local xl=tb
-		for i=1,5 do
+		for i=1,5 do --draw 5 ticks
 			line(xl,yt,xl,yt+2,7)
 			if lvl < (i-1)*3 then
 				for j=0,15 do
@@ -1118,7 +1131,7 @@ function deathmsg_anim()
 		cprint("\""..msg.."\"",64,ypos,6)
 		local mulls=extralives==1 and " mulligan" or " mulligans"
 		cprint(""..extralives..mulls,64,ypos+24,7)
-		cprint(" left this tau",64,ypos+32,7)
+		cprint("left this tau",64,ypos+32,7)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
 				if tick%20>10 then
@@ -1130,6 +1143,46 @@ function deathmsg_anim()
 		end
 		yield()
 	end
+end
+
+function gamewin_anim()
+	local i=90
+	while i>0 do -- delay for boss outro
+		i-=1
+		yield()
+	end
+	i=90
+	while i>0 do --fade out
+		local pct=1-i/90
+		cp=bwp[ceil(pct*#bwp)]
+		i-=1
+		yield()
+	end
+	clearlevel()
+	inner.enabled=false
+	
+	local msg=rnd({"2 ez","gottem"})
+	i=90
+	while i>0 or btn()==0 do --fade back in, then exit with anykey
+		local pct=i/90
+		cp=bwp[ceil(pct*#bwp)]
+		i-=1
+
+		local ypos=62
+		
+		cprint("last tau cleared. pilot notes:", 64, ypos-8,7)
+		cprint("\""..msg.."\"",64,ypos,6)
+
+		yield()
+	end	
+	p.enabled=false
+	state="title"
+	title=cocreate(title_setup)
+end
+
+function clearlevel()		
+		lz={}	zs={} hs={} rs={} fs={} 
+		b.enabled=false b.parts={} boss.enabled=false		
 end
 -->8
 --utils
@@ -1149,9 +1202,11 @@ function touching(a,b)
 	return distt(a,b)<a.r+b.r
 end
 
-function normalize(x,y)
-	local mag=sqrt(x*x+y*y)
-	return x/mag,y/mag
+function deflect(v,a)
+	local inc=atan2(v.dx,v.dy)+.5 --incidence
+	local def=a+a-inc
+	local mag=dist(0,0,v.dx,v.dy)
+	v.dx,v.dy=cos(def)*mag,sin(def)*mag
 end
 
 --signed angle difference
@@ -1245,71 +1300,51 @@ end
 
 -->8
 --palletes
-dp={ --default palette
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,--padding
-0,1,2,3,
+dp={ --default
+[0]=0,1,2,3,
 4,5,6,7,
 8,9,10,11,
 12,13,14,15,
 }
-local bw1={
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,--padding
-0,0,0,6,
-6,5,6,7,
-6,6,7,7,
-6,5,6,7,
+bwp={ --fade to black
+	{
+	[0]=0,0,0,6,
+	6,5,6,7,
+	6,6,7,7,
+	6,5,6,7,
+	},
+	{
+	[0]=0,0,0,5,
+	5,0,5,6,
+	5,5,6,6,
+	5,0,5,6,
+	},
+	{
+	[0]=0,0,0,0,
+	0,0,0,5,
+	0,0,5,5,
+	0,0,0,5,
+	},
+	{
+	[0]=0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+	}
 }
-local bw2={
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,--padding
-0,0,0,5,
-5,0,5,6,
-5,5,6,6,
-5,0,5,6,
-}
-local bw3={
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,--padding
-0,0,0,0,
-0,0,0,5,
-0,0,5,5,
-0,0,0,5,
-}
-local bw4={
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,--padding
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-0,0,0,0,
-}
-bwp={bw1,bw2,bw3,bw4}
+
 -->8
 --player animations
 
-function blink_anim(x1,y1,x2,y2,duration)
-	local grays={7,6,13,1}
-	local totalduration=duration
+function blink_anim(x1,y1,x2,y2)
+	local grays,duration={7,6,13,1},8
 	while duration>=0 do
-		local pct=(totalduration-duration)/totalduration
+		local pct=(8-duration)/8
 		local idx=ceil(pct*#grays)
 		p.x,p.y=x1,y1
 		local lines=p:coords()
 		for l in all(lines) do
-			color(grays[idx])
-			line(l.x1,l.y1,l.x2,l.y2)
+			line(l.x1,l.y1,l.x2,l.y2,grays[idx])
 		end
 		duration-=1
 		p.x,p.y=x2,y2
@@ -1425,7 +1460,7 @@ end
 -->8
 --title screen
 function title_setup()
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={}
+	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={} inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
 --	add(lz,{a=.5,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
@@ -1463,49 +1498,9 @@ function title_setup()
 		add(rs,r)
 	end
 	yield()
+	
 	local c=0
-	local col1,col2=flr(rnd(16)),flr(rnd(16))
-	local t,trate=1,.5
---	local fills={
---		0b1111000011110000.11,
---		0b0000111100001111.11
---	}
---	local fills={
---		0b0000000000000000.11,	
---		0b1111000000000000.11,
---		0b1111111100000000.11,
---		0b1111111111110000.11,
---		0b1111111111111111.11,
---	}
---	local fills={
---		0b1111111111111111.11,
---		0b1111111111110000.11,
---		0b1111111100000000.11,
---		0b1111000000000000.11,
---		0b0000000000000000.11,	
---	}
---	fills={
---[0]=0b0000111111111111.11,
---				0b1111111111110000.11,
---				0b1111111100001111.11,
---				0b1111000011111111.11,
---	}
-	fills={
-[0]=0b0000111111111111.11,
-				0b1111000011111111.11,
-				0b1111111100001111.11,
-				0b1111111111110000.11,
-	}
-fills={
-[0]=0b1111000000000000.11,
-				0b0000111100000000.11,
-				0b0000000011110000.11,
-				0b0000000000001111.11,
-	}
-
-	fin=1
-	local col1={14,8,2,1}
-	local col2={1,2,8,14}
+	local col1,col2={14,8,2,1},{1,2,8,14}
 	local frate=.1
 	local scany=0
 	local dd=10--sleep input
@@ -1532,13 +1527,11 @@ fills={
 
 --scan line down the logotype
 		pal()
-		local colc
 		for i=1,4 do
 			local os=sin((scany+i)/100)*sc.h
 			for x=1,sc.w do
-				if os>.5 then colc=col2 else colc=col1 end
 				if sget(sc.x+x,sc.y+os)==7 then				
-					pset(tc.x+x,tc.y+os,colc[i])				
+					pset(tc.x+x,tc.y+os,os>.5 and col2[i] or col1[i])
 				end
 			end
 		end		
@@ -1638,22 +1631,22 @@ __gfx__
 0fffff00f0ffff0000ffff0000fffff0008080000e000ee00000000000ffff000000000000011777777777100000000000011777710000000011111000000000
 f0000f000000f000000f000000f00000000800000ee0ee00000000000f0000f00000000000177777777771100000000000017717710000000177771000000000
 000000f000000f000000f000000f000000000000000ee00000000000f000000f0000000000177777777771000000000000117717710000001777777100000000
-00000000000000000101101000000000000000000000000000000000000000000000000000177777777771001111000000177717710000017777777100000000
-05555500088888000011110000000000000000000000000000000000000000000000000000177771177710017771100001177117710000177777777100000000
-55050550880808800110011000000000000070000000000000000000000000000000000000177111777710017777100001777117710000177777771000000000
-55050550888888800110011000000000777777770000000000000000000000000000000000011017777100177777100001771017710001777777110000000000
-55555550880008800011110000000000000070000000000000000000000000000000000000000017771000177777100017771017710017777771000000000000
-05555500088888000101101000000000000000000000000000000000000000000000000000000177771001777777100017771117710017777710000000000000
-05050500000000000000000000000000000000000000000000000000000000000000000000000177710001777777100177777777710177777100000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000001777710017771777100177777777710177771111111000000000
-85800000555b000055500000ff000000000000000000000000000000000000000000000000001777100017771777101177777777711777711777771000000000
-58500000b5b00000555000000f000000000000000000000000000000000000000000000000017777100177771777101777777777711777117777777100000000
-858000005b50000055500000ff000000000000000000000000000000000000000000000000177771000177711777101777777777717771177777777100000000
-000000000000000000000000f0000000000000000000000000000000000000000000000000177710000177101777117777111177717771177771777100000000
-000000000000000000000000ff000000000000000000000000000000000000000000000001777710001777101777117771000177717710011111777100000000
-00000000000000000000000000000000000000000000000000000000000000000000000001777100001777111777117771000177717710000177771100000000
-00000000000000000000000000000000000000000000000000000000000000000000000017777100017777777777177710000177717711111777771000000000
-000000eeeeeeeeee00000000000eeeeeeeeee0000000000000000000000000000000000017771000017777777777177710000177717771177777710000000000
+000000000000000001011010000000000000000000000eeeeee00000000000000000000000177777777771001111000000177717710000017777777100000000
+0555550008888800001111000000000000000000000ee000000ee000000000000000000000177771177710017771100001177117710000177777777100000000
+550505508808088001100110000000000000700000e0000000000e00000000000000000000177111777710017777100001777117710000177777771000000000
+55050550888888800110011000000000777777770e000000000000e0000000000000000000011017777100177777100001771017710001777777110000000000
+55555550880008800011110000000000000070000e000000000000e0000000000000000000000017771000177777100017771017710017777771000000000000
+0555550008888800010110100000000000000000e00000000000000e000000000000000000000177771001777777100017771117710017777710000000000000
+0505050000000000000000000000000000000000e00000000000000e000000000000000000000177710001777777100177777777710177777100000000000000
+0000000000000000000000000000000000000000e00000080000000e000000000000000000001777710017771777100177777777710177771111111000000000
+85800000555b000055500000ff00000000000000e00008888800000e000000000000000000001777100017771777101177777777711777711777771000000000
+58500000b5b00000555000000f00000000000000e00000080000000e000000000000000000017777100177771777101777777777711777117777777100000000
+858000005b50000055500000ff00000000000000e00000000000000e000000000000000000177771000177711777101777777777717771177777777100000000
+000000000000000000000000f0000000000000000e000000000000e0000000000000000000177710000177101777117777111177717771177771777100000000
+000000000000000000000000ff000000000000000e000000000000e0000000000000000001777710001777101777117771000177717710011111777100000000
+000000000000000000000000000000000000000000e0000000000e00000000000000000001777100001777111777117771000177717710000177771100000000
+0000000000000000000000000000000000000000000ee000000ee000000000000000000017777100017777777777177710000177717711111777771000000000
+000000eeeeeeeeee00000000000eeeeeeeeee00000000eeeeee00000000000000000000017771000017777777777177710000177717771177777710000000000
 0000ee0000000000e00000000eeffffffffffe000000000000000000000000000000000177771000017777777777177100000177717777777777100000000000
 000e0000000000000e000000efffffffffffffe00000000000008800000000000000000177710000177777777777111100000177711777777771000000000000
 000e00000000000000e00000effffffffffffffe0000000000080080000000000000001777711110177777777777100000000177101777777710000000000000
@@ -1907,12 +1900,12 @@ __sfx__
 0108000005050070400a030130201f010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0008000005450074400a630136201f410004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
 000200000571022710297101d71007710077100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01180000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000
+011800000065000000000000000000650000000000000000006500000000000000000065000000000000000000650000000000000000006500000000000000000065000000000000000000650000000000000000
+011800000505006050050500605005050060500505006050050500505006050050500605005050060500505006050050500605005050060500505006050050500505006050060500505005050060500505006050
+011800002a0532a0530000329053290530000300003000032a0532a0530000329053290530000300003000032a0532a0530000329053290530000300003000032a0532a053000032905329053000030000300003
+011800001505113051110511c0511f0511d0511c0511a0511a0501a0501a0501a0501a0501a0501a0501a05000000000010000100001000010000100001000010000000000000000000000000000000000000000
+011800001605114051120511d051200511e0511d0511b0511b0501b0501b0501b0501b0501b0501b0501b05019000020010200102001020010200102001020010200102001020010200102001020010200102001
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1943,4 +1936,12 @@ __music__
 01 31424344
 02 30424344
 00 36354344
+00 41424344
+00 41424344
+01 1a1b4244
+00 1a1b1c44
+00 1a1b1c44
+00 401b1d44
+00 1b1e4344
+02 1b1f4344
 
