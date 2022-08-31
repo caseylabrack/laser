@@ -5,24 +5,20 @@ __lua__
 -- casey labrack
 
 -- todo:
+--  2p
 --  more sounds esp level transition
---  2p?
---  death replays
---  sensitivity adjust
+--  game win: promenade. intro: gnome. boss: meno mosso
+--  improve level transition. particles? faux 3d (tempest)? ship zooms in (tempest)? 
+--  different rocket trail
 
-version=33
-p = {x=80,y=30,dx=0,dy=0,
-					a=.75,t=.25,rt=.05,r=3,friction=.92,
-					hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
-					enabled=false,thrusting=false,
-					gun=0,gunfull=120,gunfail=false,gunfailtick=0,
-					flipready=10,fliplast=0,}
+version=34
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
 	{roid=1.5,flower=1.5,bomb=45,boss=3},--normal
 	{roid=1,flower=1,bomb=30,boss=2},--hard
 }
 laserspeeds={.005,.004,.003}
+ps= {} --players
 lz= {} --lasers
 zs= {} --safe zones
 hs= {} --homing bombs
@@ -30,7 +26,7 @@ as= {} --animations (coroutines)
 a2= {} --animations in draw phase
 fs= {} --flowers
 rs= {} --roids
-b = {x=0,y=0,dx,dy,a=0,r=2,speed=5,enabled=false,parts={}}
+bs= {} --bullets
 boss = {enabled=false,
 								r=3,steadyx=64,steadyy=64,lasthit=-100,
 								spawnnum=3,finalsize=10,
@@ -104,6 +100,50 @@ function _init()
 	screenshake=dget(1)==1
 	difficulty=dget(2)
 	difficulty=difficulty==0 and 1 or difficulty
+	initplayers()
+
+	-- bullets init	
+	for i=1,2 do
+		add(bs,
+		setmetatable({
+			x=0,y=0,a=0,dx=0,dy=0,enabled=false,
+			r=2,speed=5,parts={},
+			splash=function(_ENV)
+				for i=1,10 do
+					local ps={}
+					ps.x,ps.y=x,y
+					local d=rnd(4)
+					local ang=rndr(-.2,.2)
+					ps.dx=cos(a+.5+ang)*d
+					ps.dy=sin(a+.5+ang)*d
+					ps.t=rnd(6)
+					add(parts,ps)
+				end
+			end,
+			
+			doparticles=function(_ENV)
+				for bp in all(parts) do
+					bp.t-=1
+					bp.x+=bp.dx or 0
+					bp.y+=bp.dy or 0
+					if bp.t<0 then
+						del(parts,bp)
+					end
+				end
+			end,
+			
+			render=function(_ENV)
+--				if not enabled then return end
+				if enabled then
+					line(x,y,x-dx,y-dy,12)
+				end
+				for p in all(parts) do
+					pset(p.x,p.y,12)
+				end
+			end,
+		},{__index=_ENV}))
+	end
+	
 	title=cocreate(title_setup)
 	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 	menuitem(2, "screenshake:"..(screenshake and "on" or "off"), screenshake_toggle)
@@ -219,72 +259,80 @@ if boss.enabled then
 		log=boss.hp
 end
 
-if p.enabled then
-	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
-	if btn(➡️) then p.a=p.a-p.rt end
-	if btn(⬅️) then p.a=p.a+p.rt end
-	if btn(⬇️) then
-		if tick-p.fliplast>p.flipready then
-		 p.a+=.5
-		 p.fliplast=tick
-	 end
-	end
-	if btn(thrust_btn) then
-		p.dx+=cos(p.a)*p.t
-		p.dy+=sin(p.a)*p.t
-		if not p.thrusting then
-			p.thrusting=true
-			sfx(2)
-		end
-	else
-		sfx(2,-2)
-		p.thrusting=false
-	end
-	if btn(⬆️) then
-	 if p.charge>p.fullcharge then
-			local x1,y1=p.x,p.y
-			p.x+=cos(p.a)*p.hop
-			p.y+=sin(p.a)*p.hop
-			p.thrusting=false
-			blink=cocreate(blink_anim)
-			coresume(blink,x1,y1,p.x,p.y)
-			p.charge=0
-			sleep=8
-			sfx(22)
-		else
-			if tick-p.hopfailtick>2 then
-				p.hopfail=true
-				sfx(12)
-				p.hopfailtick=tick
-			end
-		end
-	end
-	if btn(fire_btn) and not b.enabled then
-		if p.gun==p.gunfull then
-			b.enabled=true
-			b.x=p.x b.y=p.y b.a=p.a
-			b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
-			sfx(20)
---		sfx(25)
-		else
-			if tick-p.gunfailtick>2 then
-				p.gunfail=true
-				sfx(12)
-				p.gunfailtick=tick
-			end
-		end
-	end
+for p in all(ps) do
+	p:update()
 end
-p.x+=p.dx
-p.y+=p.dy
-p.dx*=p.friction
-p.dy*=p.friction
+
+--for i,p in pairs(ps) do
+--	
+--if p.enabled then
+--	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
+--	if btn(➡️,i) then p.a=p.a-p.rt end
+--	if btn(⬅️,i) then p.a=p.a+p.rt end
+--	if btn(⬇️,i) then
+--		if tick-p.fliplast>p.flipready then
+--		 p.a+=.5
+--		 p.fliplast=tick
+--	 end
+--	end
+--	if btn(thrust_btn,i) then
+--		p.dx+=cos(p.a)*p.t
+--		p.dy+=sin(p.a)*p.t
+--		if not p.thrusting then
+--			p.thrusting=true
+--			sfx(2)
+--		end
+--	else
+--		sfx(2,-2)
+--		p.thrusting=false
+--	end
+--	if btn(⬆️,i) then
+--	 if p.charge>p.fullcharge then
+--			local x1,y1=p.x,p.y
+--			p.x+=cos(p.a)*p.hop
+--			p.y+=sin(p.a)*p.hop
+--			p.thrusting=false
+--			blink=cocreate(blink_anim)
+--			coresume(blink,x1,y1,p.x,p.y)
+--			p.charge=0
+--			sleep=8
+--			sfx(22)
+--		else
+--			if tick-p.hopfailtick>2 then
+--				p.hopfail=true
+--				sfx(12)
+--				p.hopfailtick=tick
+--			end
+--		end
+--	end
+--	if btn(fire_btn,i) and not b.enabled then
+--		if p.gun==p.gunfull then
+--			b.enabled=true
+--			b.x=p.x b.y=p.y b.a=p.a
+--			b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
+--			sfx(20)
+----		sfx(25)
+--		else
+--			if tick-p.gunfailtick>2 then
+--				p.gunfail=true
+--				sfx(12)
+--				p.gunfailtick=tick
+--			end
+--		end
+--	end
+--end
+--p.x+=p.dx
+--p.y+=p.dy
+--p.dx*=p.friction
+--p.dy*=p.friction
+--
+--end
 
 --flowers
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
-		if p.enabled and touching(p,l) then died(l) end
+--		if p.enabled and touching(p,l) then died(l) end
 		l.growcount+=1
 		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
@@ -407,7 +455,8 @@ end
 --homing bomb move
 for h in all(hs) do
 	if h.enabled then
-		local a=atan2(p.x-h.x+rnd(4)-2,p.y-h.y+rnd(4)-2)
+		local a=1
+--		local a=atan2(p.x-h.x+rnd(4)-2,p.y-h.y+rnd(4)-2)
 		h.dx+=cos(a)*h.t	 h.dy+=sin(a)*h.t
 		h.frametick+=1
 	else
@@ -428,50 +477,55 @@ for h in all(hs) do
 	end
 end
 
-local ang=atan2(p.x-64,p.y-64)
-
+for p in all(ps) do
+	local ang=atan2(p.x-64,p.y-64)
+	
 -- player vs outside wall
-if dist(p.x,p.y,64,64)>63 then
-	p.x,p.y=64+cos(ang)*63,64+sin(ang)*63
-end
-
--- player vs inside wall
-if touching(inner,p) then
-	p.x,p.y=64+cos(ang)*8,64+sin(ang)*8
-end
-
-if p.enabled then
-	-- player vs. obstacles
-	for v in all(rs) do
-		if (touching(p,v)) died(v)
-	end
-
-	--player vs. homing bombs
-	for h in all(hs) do
-		if (touching(p,h)) died(h)
+	if dist(p.x,p.y,64,64)>63 then
+		p.x,p.y=64+cos(ang)*63,64+sin(ang)*63
 	end
 	
-	--player vs. boss
-	if boss.enabled and touching(p,boss.floor) then
-			died(boss)
+-- player vs inside wall
+	if touching(inner,p) then
+		p.x,p.y=64+cos(ang)*8,64+sin(ang)*8
+	end
+	
+	if p.enabled then
+		-- player vs. obstacles
+		for v in all(rs) do
+			if (touching(p,v)) died(p,v)
+		end
+	
+		--player vs. homing bombs
+		for h in all(hs) do
+			if (touching(p,h)) died(p,h)
+		end
+		
+		--player vs. boss
+		if boss.enabled and touching(p,boss.floor) then
+				died(p,boss)
+		end
 	end
 end
 
 --laser/player collision
-if p.enabled then
-	local d=dist(p.x,p.y,64,64)
-	local vulnerable=true
-	for z in all(zs) do
-		if z.state~="moving" and touching(p,z) then vulnerable=false break end
-	end
-	if vulnerable then
-		for l in all(lz) do
-			if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
-				died(l)
+for p in all(ps) do	
+	if p.enabled then
+		local d=dist(p.x,p.y,64,64)
+		local vulnerable=true
+		for z in all(zs) do
+			if z.state~="moving" and touching(p,z) then vulnerable=false break end
+		end
+		if vulnerable then
+			for l in all(lz) do
+				if touching(p,{x=64+cos(l.a)*d,y=64+sin(l.a)*d,r=0}) then
+					died(p,l)
+				end
 			end
 		end
 	end
 end
+
 
 --bouncing around
 for v in all(rs) do
@@ -496,99 +550,98 @@ for v in all(rs) do
 end
 
 --bullet
-for bp in all(b.parts) do
-	bp.t-=1
-	bp.x+=bp.dx or 0
-	bp.y+=bp.dy or 0
-	if bp.t<0 then
-		del(b.parts,bp)
-	end
-end
-if b.enabled then
-	local x1=b.x
-	local y1=b.y
-	for i=1,5 do
-		b.x=x1+b.dx*i/5
-		b.y=y1+b.dy*i/5
-		add(b.parts,
-		{x=b.x,y=b.y,t=rnd(3)})
-		for f in all(fs) do --flowers
-			for l in all(f) do --leaves
-				if touching(b,l) then
+for b in all(bs) do
+
+	b:doparticles()
+
+	if b.enabled then
+		local x1=b.x
+		local y1=b.y
+		for i=1,5 do
+			b.x=x1+b.dx*i/5
+			b.y=y1+b.dy*i/5
+			add(b.parts,
+			{x=b.x,y=b.y,t=rnd(3)})
+			for f in all(fs) do --flowers
+				for l in all(f) do --leaves
+					if touching(b,l) then
+						b.enabled=false sfx(20,-2)
+						b:splash()
+	--					sfx(24)
+						sfx(21)
+						l.r-=dmg[difficulty].flower
+						l.growcount=0
+						l.hit=tick
+						if l.r<3 then
+							shake+=2
+							del(f,l)
+							if #f==0 then del(fs,f) end
+						end
+						goto donebullet
+					end
+				end
+			end
+			for v in all(rs) do --roids
+				if touching(b,v) then
 					b.enabled=false sfx(20,-2)
 					b:splash()
---					sfx(24)
 					sfx(21)
-					l.r-=dmg[difficulty].flower
-					l.growcount=0
-					l.hit=tick
-					if l.r<3 then
-						shake+=2
-						del(f,l)
-						if #f==0 then del(fs,f) end
+					local oldr=v.r
+					v.r-=dmg[difficulty].roid
+					v.hit=tick
+					if v.r<3 then	
+						shake+=1.1
+						local z=cocreate(rsplode)
+						coresume(z,v.x,v.y,oldr,v.dx,v.dy)
+						add(a2,z)
+						del(rs,v) 
 					end
 					goto donebullet
 				end
 			end
-		end
-		for v in all(rs) do --roids
-			if touching(b,v) then
-				b.enabled=false sfx(20,-2)
-				b:splash()
-				sfx(21)
-				local oldr=v.r
-				v.r-=dmg[difficulty].roid
-				v.hit=tick
-				if v.r<3 then	
-					shake+=1.1
-					local z=cocreate(rsplode)
-					coresume(z,v.x,v.y,oldr,v.dx,v.dy)
-					add(a2,z)
-					del(rs,v) 
+			for h in all(hs) do --homing
+				if touching(h,b) then
+					b.enabled=false sfx(20,-2)
+					b:splash()
+	--				sfx(21)
+					h.enabled=false
+					h.timer=dmg[difficulty].bomb
+					h.dx+=b.dx/4	h.dy+=b.dy/4
+					goto donebullet
 				end
-				goto donebullet
 			end
-		end
-		for h in all(hs) do --homing
-			if touching(h,b) then
+			if boss.enabled and touching(boss,b) then
+				boss.hp-=dmg[difficulty].boss
+				boss.lasthit=tick
+				b.enabled=false
+				b:splash()
+				goto donebullet
+			end			
+			if touching(inner,b) or distt(inner,b)>63 then
 				b.enabled=false sfx(20,-2)
 				b:splash()
---				sfx(21)
-				h.enabled=false
-				h.timer=dmg[difficulty].bomb
-				h.dx+=b.dx/4	h.dy+=b.dy/4
+	--			sfx(25)
+	--			sfx(21)
 				goto donebullet
 			end
-		end
-		if boss.enabled and touching(boss,b) then
-			boss.hp-=dmg[difficulty].boss
-			boss.lasthit=tick
-			b.enabled=false
-			b:splash()
-			goto donebullet
-		end			
-		if touching(inner,b) or distt(inner,b)>63 then
-			b.enabled=false sfx(20,-2)
-			b:splash()
---			sfx(25)
---			sfx(21)
-			goto donebullet
 		end
 	end
+	::donebullet::
 end
-::donebullet::
 
 --level win
-if #rs==0 and #fs==0 and p.enabled and boss.enabled==false and state=="running" then
-	state="wiping"
-	dset(3,1) -- has beaten a level
-	extralives=mulligans
-	sfx(2,-2)
-	p.thrusting=false
-	lvl+=1
-	if lvl>#lvls then lvl=1 end
-	wipe=cocreate(wipe_anim)
-	state="wipe"
+if ps[1].enabled or ps[2].enabled then
+	if #rs==0 and #fs==0 and boss.enabled==false and state=="running" then
+	--if #rs==0 and #fs==0 and ps[1].enabled and boss.enabled==false and state=="running" then
+		state="wiping"
+		extralives=mulligans
+	--	sfx(2,-2)
+		ps[1].thrusting,ps[2].thrusting=false,false
+		lvl+=1
+--		if lvl>#lvls then lvl=1 end
+		wipe=cocreate(wipe_anim)
+		state="wipe"
+	end
 end
 
 -- game win
@@ -601,20 +654,33 @@ end
 
 end
 
-function died(cause)
+function died(player,cause)
 	if state~="running" then return end
-	sfx(2,-2)
+--	sfx(2,-2)
 	sfx(13)
 	shake+=4
-	p.enabled=false
-	p.thrusting=false
-	dethparts=cocreate(deathparticles)
-	coresume(dethparts,cause)
-	extralives-=1
-	state="death"
-	local a=cocreate(death)
-	coresume(a,15,30)
-	add(as,a)
+	if player.enabled then
+		player.enabled=false
+		player.thrusting=false
+		
+		player:death(cause)
+	end
+	
+	if not ps[1].enabled and not ps[2].enabled then
+		log="lose"
+		extralives-=1
+		state="death"
+		local a=cocreate(death)
+		coresume(a,15,30)
+		add(as,a)
+	end
+--	dethparts=cocreate(deathparticles)
+--	coresume(dethparts,cause)
+--	extralives-=1
+--	state="death"
+--	local a=cocreate(death)
+--	coresume(a,15,30)
+--	add(as,a)
 end
 
 function _draw()
@@ -743,14 +809,11 @@ for h in all(hs) do
 end
 
 --player
-if p.enabled then
-	local lines,fire,prow=p:coords()
-	if p.thrusting then
-		circfill(fire.x,fire.y,1,rndr(8,11))
-	end
-	for l in all(lines) do
-		line(l.x1,l.y1,l.x2,l.y2,7)
-	end
+for p in all(ps) do
+	p:render()
+	pal(dp)
+	p:renderdeath()
+	pal(cp)
 end
 
 -- roids
@@ -810,13 +873,17 @@ if boss.enabled then
 end
 
 --bullet
-if b.enabled then
-	line(b.x,b.y,b.x-b.dx,b.y-b.dy,12)
+for b in all(bs) do
+	b:render()
+--	line(b.x,b.y,b.x-b.dx,b.y-b.dy,12)
+--end
+--if b.enabled then
+--	line(b.x,b.y,b.x-b.dx,b.y-b.dy,12)
 end
 
-for bp in all(b.parts) do
-	pset(bp.x,bp.y,12)
-end
+--for bp in all(b.parts) do
+--	pset(bp.x,bp.y,12)
+--end
 
 if wipe and costatus(wipe)~="dead" then coresume(wipe) end
 if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
@@ -826,29 +893,29 @@ pal()
 
 if state=="running" then
 	--gun countdown
-	local x,y,x2,y2=97,0,127,8
-	local pct=min(p.gun/p.gunfull,1)
-	local f=p.gun<p.gunfull and 1 or 12
-	if p.gunfail then
- 	f=8
-		p.gunfail=false
-	end
-	clip(x,y,(x2-x)*pct+1,y2+1)
-	rect(x,y,x2,y2,f)
-	print("gun rdy",x+2,y+2,f)
-
-	--hop countdown
-	local f=p.charge<p.fullcharge and 3 or 11
-	if p.hopfail then
-		f=8
-		p.hopfail=false
-	end
- local pct=min(p.charge/p.fullcharge,1)
-	local x,x2,y,y2=109,127,10,18
-	clip(x,y,(x2-x)*pct+1,10)
-	rect(x,y,x2,y2,f)
-	clip()
-	print("tele",x+2,y+2,f)
+--	local x,y,x2,y2=97,0,127,8
+--	local pct=min(p.gun/p.gunfull,1)
+--	local f=p.gun<p.gunfull and 1 or 12
+--	if p.gunfail then
+-- 	f=8
+--		p.gunfail=false
+--	end
+--	clip(x,y,(x2-x)*pct+1,y2+1)
+--	rect(x,y,x2,y2,f)
+--	print("gun rdy",x+2,y+2,f)
+--
+--	--hop countdown
+--	local f=p.charge<p.fullcharge and 3 or 11
+--	if p.hopfail then
+--		f=8
+--		p.hopfail=false
+--	end
+-- local pct=min(p.charge/p.fullcharge,1)
+--	local x,x2,y,y2=109,127,10,18
+--	clip(x,y,(x2-x)*pct+1,10)
+--	rect(x,y,x2,y2,f)
+--	clip()
+--	print("tele",x+2,y+2,f)
 end
 
 if state=="running" or state=="setup" then
@@ -900,7 +967,7 @@ function wipe_anim()
 --	outer.enabled=false	
 	local start=tick
 	while tick-start<30 do
-		if tick-start==15 then p.enabled=false end
+		if tick-start==15 then ps[1].enabled=false end
 		local pct=(tick-start)/30
 		pct=easeinexpo(pct)
 		local r=inner.r+(63-inner.r)*pct
@@ -920,13 +987,18 @@ end
 
 function spawn()
 	state="setup"
-	i=10 c=15 p.x=64 p.y=32 p.dx=0 p.dy=0 p.charge=p.fullcharge p.a=-.1 p.gun=0
+	i=10 c=15 
+	for p in all(ps) do
+		p:spawn()
+	end
+
 	--player entering animation
-	local enteranim=cocreate(penter)
-	coresume(enteranim,p.x,p.y,c)
-	add(a2,enteranim)
+--	local enteranim=cocreate(penter)
+--	coresume(enteranim,ps[1].x,ps[1].y,c)
+--	add(a2,enteranim)
 	while c>0 do c-=1 yield() end
-	p.enabled=true
+--	ps[1].enabled=true
+	for p in all(ps) do p.enabled=true end
 	inner.enabled=true
 	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
@@ -939,7 +1011,7 @@ function spawn()
 				local a=aim_away(.25,.25)
 				local d=rnd(64-24)+12
 				r.x=64+cos(a)*d r.y=64+sin(a)*d
-				local to_p=atan2(p.x-r.x,p.y-r.y)
+				local to_p=1--atan2(p.x-r.x,p.y-r.y)
 				local a2=aim_away(to_p,.25)
 				local spd=rnd(1.25)+.5
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
@@ -1177,7 +1249,6 @@ function gamewin_anim()
 		
 		boss.x,boss.y=boss.steadyx+rnd()*3*(1-pct),boss.steadyy+rnd()*3*(1-pct)
 		
-		
 		yield()
 	end
 	i=90
@@ -1210,8 +1281,11 @@ function gamewin_anim()
 end
 
 function clearlevel()		
-		lz={}	zs={} hs={} rs={} fs={} 
-		b.enabled=false b.parts={} boss.enabled=false		
+		lz={}	zs={} hs={} rs={} fs={}
+		for b in all(bs) do
+			b.enabled=false b.parts={}
+		end 
+		boss.enabled=false		
 end
 -->8
 --utils
@@ -1328,7 +1402,7 @@ function smallcaps(s)
 end
 
 -->8
---palletes
+--palletes and misc animations
 dp={ --default
 [0]=0,1,2,3,
 4,5,6,7,
@@ -1362,8 +1436,172 @@ bwp={ --fade to black
 	}
 }
 
+--misc animations
+function rsplode(x,y,r,dx,dy)
+	local c=0
+	while c<10 do
+		c+=1
+		for i=i,12 do
+			pset(x+rnd(r),y+rnd(r),4)
+		end	
+		x+=dx y+=dy
+		yield()
+	end
+end
+
+-- bullet hit animation
+--function b:splash(num)
+--	local num=num or 10
+--	for i=1,num do
+--		local ps={}
+--		ps.x,ps.y=self.x,self.y
+--		local d=rnd(4)
+--		local ang=rndr(-.2,.2)
+--		ps.dx=cos(b.a+.5+ang)*d
+--		ps.dy=sin(b.a+.5+ang)*d
+--		ps.t=rnd(6)
+--		add(self.parts,ps)
+--	end
+--end
 -->8
---player animations
+--player
+
+function initplayers()
+	for i=1,2 do
+		add(ps,
+			setmetatable({
+			playing=true,id=i-1,--plyrs 0 and 1
+			x=80,y=30,dx=0,dy=0,
+			a=.75,t=.25,rt=.05,r=3,friction=.92,
+			hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
+			enabled=false,thrusting=false,
+			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
+			flipready=10,fliplast=0,
+			deathlines={},deathpnts={},
+			
+			update=function(_ENV)
+				if not enabled then return end
+				charge+=1 gun=min(gun+1,gunfull)
+				if btn(➡️,id) then a-=rt log=a end
+				if btn(⬅️,id) then a+=rt log=a end
+				if btn(⬇️,id) then
+					if tick-fliplast>flipready then
+					 a+=.5
+					 fliplast=tick
+				 end
+				end
+				if btn(thrust_btn,id) then
+					dx+=cos(a)*t
+					dy+=sin(a)*t
+					if not thrusting then
+						thrusting=true
+--						sfx(2)
+					end
+				else
+--					sfx(2,-2)
+					thrusting=false
+				end
+				if btn(fire_btn,id) and not bs[id+1].enabled then
+					if gun==gunfull then
+						local b=bs[id+1]
+						b.enabled=true
+						b.x,b.y,b.a=x,y,a
+						b.dx,b.dy=cos(b.a)*b.speed,sin(b.a)*b.speed
+						sfx(20)
+			--		sfx(25)
+					else
+						if tick-gunfailtick>2 then
+							gunfail=true
+							sfx(12)
+							gunfailtick=tick
+						end
+					end
+				end
+				x+=dx
+				y+=dy
+				dx*=friction
+				dy*=friction
+			end,
+			
+			render=function(_ENV)
+				if not enabled then return end
+				local lines,fire,prow=coords(_ENV)
+				if thrusting then
+					circfill(fire.x,fire.y,1,rndr(8,11))
+				end
+				for l in all(lines) do
+					line(l.x1,l.y1,l.x2,l.y2,id==0 and 7 or 15)
+				end
+			end,
+			
+			coords=function(_ENV)
+				local m={x=x+cos(a)*2,y=y+sin(a)*2}
+				local prow=.05
+				local len=6
+				local aft=len-2
+				return
+				-- ship lines
+				{
+					{x1=m.x,y1=m.y,x2=m.x-cos(a-prow)*len,y2=m.y-sin(a-prow)*len},
+					{x1=m.x,y1=m.y,x2=m.x-cos(a+prow)*len,y2=m.y-sin(a+prow)*len},
+					{x1=m.x-cos(a+prow)*len,y1=m.y-sin(a+prow)*len,x2=m.x-cos(a-prow)*len,y2=m.y-sin(a-prow)*len},
+				},
+				-- rocket point
+				{x=m.x-cos(a)*(len+1),
+				y=m.y-sin(a)*(len+1)},
+				--prow
+				{x=m.x,y=m.y}
+			end,
+			
+			spawn=function(_ENV)
+				x,a,dx,dy,charge,gun=64,-.1,0,0,fullcharge,0
+				y=id==0 and 32 or 16
+			end,
+			
+			death=function(_ENV,cause)
+				local lines=coords(_ENV)				
+				for l in all(lines) do
+					l.dx,l.dy=cause.dx or dx,cause.dy or dy
+					l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
+					l.dr=rnd(.05) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
+					local ang=atan2(l.midx-x,l.midy-y)
+					l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
+					add(deathlines,l)
+				end
+				
+				local s = 4 --dist spread
+				local ds=.1 --speed spread
+				for i=1,10 do
+					local z = {x=x+rndr(-s,s),
+																y=y+rndr(-s,s),
+																dx=(cause.dx or dx)+rndr(-ds,ds),
+																dy=(cause.dy or dy)+rndr(-ds,ds)}
+					local ang=atan2(z.x-x,z.y-y)
+					z.dx+=cos(ang)*0.1
+					z.dy+=sin(ang)*0.1
+					add(deathpnts,z)
+				end
+			end,
+			
+			renderdeath=function(_ENV)
+				color(7)
+				for l in all(deathlines) do
+					l.midx+=l.dx
+					l.midy+=l.dy
+					l.r+=l.dr
+					line(l.midx-cos(l.r)*3,
+										l.midy-sin(l.r)*3,
+										l.midx+cos(l.r)*3,
+										l.midy+sin(l.r)*3)
+				end
+				for z in all(deathpnts) do
+					z.x+=z.dx z.y+=z.dy
+					pset(z.x,z.y)
+				end
+			end,
+		},{__index=_ENV}))
+	end
+end
 
 function blink_anim(x1,y1,x2,y2)
 	local grays,duration={7,6,13,1},8
@@ -1381,115 +1619,42 @@ function blink_anim(x1,y1,x2,y2)
 	end
 end
 
---ship lines,rocket point,prow
-function p:coords()
-	local m={x=p.x+cos(p.a)*2,y=p.y+sin(p.a)*2}
-	local prow=.05
-	local len=6
-	local aft=len-2
-	return
-	-- ship lines
-	{
-		{x1=m.x,y1=m.y,x2=m.x-cos(p.a-prow)*len,y2=m.y-sin(p.a-prow)*len},
-		{x1=m.x,y1=m.y,x2=m.x-cos(p.a+prow)*len,y2=m.y-sin(p.a+prow)*len},
-		{x1=m.x-cos(p.a+prow)*len,y1=m.y-sin(p.a+prow)*len,x2=m.x-cos(p.a-prow)*len,y2=m.y-sin(p.a-prow)*len},
-	},
-	-- rocket point
-	{x=m.x-cos(p.a)*(len+1),
-	y=m.y-sin(p.a)*(len+1)},
-	--prow
-	{x=m.x,y=m.y}
-end
-
---player death particles
-function deathparticles(cause)
-	local lines=p:coords()
-
-	for l in all(lines) do
-		l.dx,l.dy=cause.dx or p.dx,cause.dy or p.dy
-		l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
-		l.dr=rnd(.05) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
-		local ang=atan2(l.midx-p.x,l.midy-p.y)
-		l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
-	end
-
-	local parts={}
-	local s = 4 --dist spread
-	local ds=.1 --speed spread
-	for i=1,10 do
-		local z = {x=p.x+rndr(-s,s),
-													y=p.y+rndr(-s,s),
-													dx=(cause.dx or p.dx)+rndr(-ds,ds),
-													dy=(cause.dy or p.dy)+rndr(-ds,ds)}
-		local ang=atan2(z.x-p.x,z.y-p.y)
-		z.dx+=cos(ang)*0.1
-		z.dy+=sin(ang)*0.1
-		add(parts,z)
-	end
-
-	local i=10
-	while not p.enabled do
-		i-=1
-		pal(dp)
-
---		if i>0 then
---			camera(rnd(4)-2,rnd(4)-2)
---		else
---			camera()
---		end
-		color(7)
-		for l in all(lines) do
-			l.midx+=l.dx
-			l.midy+=l.dy
-			l.r+=l.dr
-			line(l.midx-cos(l.r)*3,
-								l.midy-sin(l.r)*3,
-								l.midx+cos(l.r)*3,
-								l.midy+sin(l.r)*3)
-		end
-		for z in all(parts) do
-			z.x+=z.dx z.y+=z.dy
-			pset(z.x,z.y)
-		end
-		pal(cp)
-		yield()
-	end
-end
-
 --player enter
 function penter(x,y,duration)
-	local start=tick
-	local t=0
-	local dur=duration/2
-	sfx(18)
-	while t<1 do
-		t=(tick-start)/dur
-		t=easeoutexpo(t)
-		color(7)
-		line(x,y,x+30*t,y)
-		line(x,y,x-30*t,y)
-		line(x,y,x,y+30*t)
-		line(x,y,x,y-30*t)
-		circfill(x,y,t*4)
-		yield()
-	end
-	start=tick
-	t=0
-	while t<1 do
-		t=(tick-start)/dur
-		t=easeoutexpo(t)
-		line(x,y,x+30*(1-t),y)
-		line(x,y,x-30*(1-t),y)
-		line(x,y,x,y+30*(1-t))
-		line(x,y,x,y-30*(1-t))
-		circfill(x,y,(1-t)*6,7)
-		yield()
-	end
+--	local start=tick
+--	local t=0
+--	local dur=duration/2
+--	sfx(18)
+--	while t<1 do
+--		t=(tick-start)/dur
+--		t=easeoutexpo(t)
+--		color(7)
+--		line(x,y,x+30*t,y)
+--		line(x,y,x-30*t,y)
+--		line(x,y,x,y+30*t)
+--		line(x,y,x,y-30*t)
+--		circfill(x,y,t*4)
+--		yield()
+--	end
+--	start=tick
+--	t=0
+--	while t<1 do
+--		t=(tick-start)/dur
+--		t=easeoutexpo(t)
+--		line(x,y,x+30*(1-t),y)
+--		line(x,y,x-30*(1-t),y)
+--		line(x,y,x,y+30*(1-t))
+--		line(x,y,x,y-30*(1-t))
+--		circfill(x,y,(1-t)*6,7)
+--		yield()
+--	end
 end
 -->8
 --title screen
 function title_setup()
-	lz={}	zs={} hs={} rs={} fs={} b.enabled=false b.parts={} inner.enabled=true
+	lz={}	zs={} hs={} rs={} fs={} 
+--	b.enabled=false b.parts={} 
+	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
 --	add(lz,{a=.5,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
@@ -1538,7 +1703,7 @@ function title_setup()
 		c+=1
 --give the bomb something to chase
 		if rnd()>.9 then 
-			p.a,p.x,p.y=rnd(),64+cos(p.a)*63,64+sin(p.a)*63
+			ps[1].a,ps[1].x,ps[1].y=rnd(),64+cos(ps[1].a)*63,64+sin(ps[1].a)*63
 		end
 
 --spritesheet coords
@@ -1614,34 +1779,6 @@ function title_setup()
 	extralives=mulligans
 	state="wipe"
 	wipe=cocreate(wipe_anim)
-end
--->8
---misc animations
-function rsplode(x,y,r,dx,dy)
-	local c=0
-	while c<10 do
-		c+=1
-		for i=i,12 do
-			pset(x+rnd(r),y+rnd(r),4)
-		end	
-		x+=dx y+=dy
-		yield()
-	end
-end
-
--- bullet hit animation
-function b:splash(num)
-	local num=num or 10
-	for i=1,num do
-		local ps={}
-		ps.x,ps.y=self.x,self.y
-		local d=rnd(4)
-		local ang=rndr(-.2,.2)
-		ps.dx=cos(b.a+.5+ang)*d
-		ps.dy=sin(b.a+.5+ang)*d
-		ps.t=rnd(6)
-		add(self.parts,ps)
-	end
 end
 __gfx__
 00000000006dd60000000000000000000000000000c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
