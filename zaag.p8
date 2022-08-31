@@ -10,6 +10,7 @@ __lua__
 --  game win: promenade. intro: gnome. boss: meno mosso
 --  improve level transition. particles? faux 3d (tempest)? ship zooms in (tempest)? 
 --  different rocket trail
+--  gun ready animation maybe
 
 version=34
 dmg={ 
@@ -186,7 +187,8 @@ if sleep>0 then
 end
 
 if boss.enabled then
-	local towardplayer=atan2(p.x-64,p.y-64)
+	local targetplayer=closestplayer(boss)
+	local towardplayer=atan2(targetplayer.x-64,targetplayer.y-64)
 	--boss attack
 	if boss.state=="spawn" then
 		if #boss.bulges<boss.spawnnum then
@@ -428,7 +430,7 @@ end
 -- safe zones
 for z in all(zs) do
 	if z.state=="idle" then
-		if touching(p,z) then
+		if touching(ps[1],z) or (ps[2].playing and ps[2].enabled and touching(ps[2],z)) then
 			z.state="shrinking"
 		end
 	elseif z.state=="shrinking" then
@@ -667,7 +669,7 @@ function died(player,cause)
 	end
 	
 	if not ps[1].enabled and not ps[2].enabled then
-		log="lose"
+--		log="lose"
 		extralives-=1
 		state="death"
 		local a=cocreate(death)
@@ -821,9 +823,9 @@ for v in all(rs) do
 	circ(v.x,v.y,v.r,tick-v.hit>2 and 9 or 7)
 	spr(2,v.x-4,v.y-4)
 	local a=atan2(v.dx,v.dy)-.5
-	local x=v.x+cos(a)*v.r
-	local y=v.y+sin(a)*v.r
-	local m=dist(0,0,v.dx,v.dy)*3
+	local x,y,m=v.x+cos(a)*v.r,
+													v.y+sin(a)*v.r,
+													dist(0,0,v.dx,v.dy)*3
 	line(x,y,x+cos(a)*m,y+sin(a)*m)
 end
 
@@ -845,7 +847,8 @@ if boss.enabled then
 		end
 	end
 	
-	local top=atan2(p.x-boss.x,p.y-boss.y)
+	local targetplayer=closestplayer(boss)
+	local top=atan2(targetplayer.x-boss.x,targetplayer.y-boss.y)
 	local x,y,x2,y2=0,52,20,72
 	palt(0,false)
 	palt(10,true)
@@ -856,7 +859,6 @@ if boss.enabled then
 	sspr(x,y,wid,wid,
 	boss.x-scale/2,boss.y-scale/2,
 	scale,scale)
-	log=wid
 	palt()
 
 	-- if boss dying,center eye elements
@@ -875,47 +877,56 @@ end
 --bullet
 for b in all(bs) do
 	b:render()
---	line(b.x,b.y,b.x-b.dx,b.y-b.dy,12)
---end
---if b.enabled then
---	line(b.x,b.y,b.x-b.dx,b.y-b.dy,12)
 end
 
---for bp in all(b.parts) do
---	pset(bp.x,bp.y,12)
---end
-
 if wipe and costatus(wipe)~="dead" then coresume(wipe) end
-if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
+--if dethparts and costatus(dethparts)~="dead" then coresume(dethparts) end
 if blink and costatus(blink)~="dead" then coresume(blink) end
 
 pal()
 
 if state=="running" then
 	--gun countdown
---	local x,y,x2,y2=97,0,127,8
---	local pct=min(p.gun/p.gunfull,1)
---	local f=p.gun<p.gunfull and 1 or 12
---	if p.gunfail then
--- 	f=8
---		p.gunfail=false
---	end
---	clip(x,y,(x2-x)*pct+1,y2+1)
---	rect(x,y,x2,y2,f)
---	print("gun rdy",x+2,y+2,f)
---
---	--hop countdown
---	local f=p.charge<p.fullcharge and 3 or 11
---	if p.hopfail then
---		f=8
---		p.hopfail=false
---	end
--- local pct=min(p.charge/p.fullcharge,1)
---	local x,x2,y,y2=109,127,10,18
---	clip(x,y,(x2-x)*pct+1,10)
---	rect(x,y,x2,y2,f)
---	clip()
---	print("tele",x+2,y+2,f)
+	local p=ps[1]
+	local x,y,x2,y2=97,0,127,8
+	local pct=min(p.gun/p.gunfull,1)
+	local f=p.gun<p.gunfull and 1 or 12
+	if p.gunfail then
+ 	f=8
+		p.gunfail=false
+	end
+	clip(x,y,(x2-x)*pct+1,y2+1)
+	rect(x,y,x2,y2,f)
+	print("gun rdy",x+2,y+2,f)
+	
+ --hop countdown
+	if not ps[2].playing then
+		local f=p.charge<p.fullcharge and 3 or 11
+		if p.hopfail then
+			f=8
+			p.hopfail=false
+		end
+	 local pct=min(p.charge/p.fullcharge,1)
+		local x,x2,y,y2=109,127,10,18
+		clip(x,y,(x2-x)*pct+1,10)
+		rect(x,y,x2,y2,f)
+		clip()
+		print("tele",x+2,y+2,f)
+	else
+		for p in all(ps) do
+			local f=p.charge<p.fullcharge and 3 or 11
+			if p.hopfail then
+				f=8
+				p.hopfail=false
+			end
+		 local pct=min(p.charge/p.fullcharge,1)
+			local x,x2,y,y2=109,127,p.id==0 and 10 or 14,p.id==0 and 14 or 18
+			clip(x,y,(x2-x)*pct+1,10)
+			rect(x,y,x2,y2,f)
+			clip()
+		end
+		print("tele",111,12,11)
+	end
 end
 
 if state=="running" or state=="setup" then
@@ -987,7 +998,8 @@ end
 
 function spawn()
 	state="setup"
-	i=10 c=15 
+	i=10 c=15
+	sfx(18)--player spawn noise
 	for p in all(ps) do
 		p:spawn()
 	end
@@ -1448,21 +1460,6 @@ function rsplode(x,y,r,dx,dy)
 		yield()
 	end
 end
-
--- bullet hit animation
---function b:splash(num)
---	local num=num or 10
---	for i=1,num do
---		local ps={}
---		ps.x,ps.y=self.x,self.y
---		local d=rnd(4)
---		local ang=rndr(-.2,.2)
---		ps.dx=cos(b.a+.5+ang)*d
---		ps.dy=sin(b.a+.5+ang)*d
---		ps.t=rnd(6)
---		add(self.parts,ps)
---	end
---end
 -->8
 --player
 
@@ -1471,6 +1468,7 @@ function initplayers()
 		add(ps,
 			setmetatable({
 			playing=true,id=i-1,--plyrs 0 and 1
+			pcolor=i==1 and 7 or 15,
 			x=80,y=30,dx=0,dy=0,
 			a=.75,t=.25,rt=.05,r=3,friction=.92,
 			hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
@@ -1478,6 +1476,7 @@ function initplayers()
 			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
 			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
+			spawnticks=0,
 			
 			update=function(_ENV)
 				if not enabled then return end
@@ -1489,6 +1488,25 @@ function initplayers()
 					 a+=.5
 					 fliplast=tick
 				 end
+				end
+				if btn(⬆️,id) then
+				 if charge>fullcharge then
+						local x1,y1=x,y
+						x+=cos(a)*hop
+						y+=sin(a)*hop
+						thrusting=false
+--						blink=cocreate(blink_anim)
+--						coresume(blink,x1,y1,p.x,p.y)
+						charge=0
+--						sleep=8
+						sfx(22)
+					else
+						if tick-hopfailtick>2 then
+							hopfail=true
+							sfx(12)
+							hopfailtick=tick
+						end
+					end
 				end
 				if btn(thrust_btn,id) then
 					dx+=cos(a)*t
@@ -1525,12 +1543,32 @@ function initplayers()
 			
 			render=function(_ENV)
 				if not enabled then return end
-				local lines,fire,prow=coords(_ENV)
-				if thrusting then
-					circfill(fire.x,fire.y,1,rndr(8,11))
+				
+				if spawnticks<8 then
+					local lines,fire,prow=coords(_ENV)
+					if thrusting then
+						circfill(fire.x,fire.y,1,rndr(8,11))
+					end
+					for l in all(lines) do
+						line(l.x1,l.y1,l.x2,l.y2,pcolor)
+					end
 				end
-				for l in all(lines) do
-					line(l.x1,l.y1,l.x2,l.y2,id==0 and 7 or 15)
+				
+				if spawnticks>0 then
+					spawnticks-=1
+					color(pcolor)
+					local t=0
+					if spawnticks>8 then --expand
+						t=1-(spawnticks-8)/8
+					else --contract
+						t=spawnticks/8
+					end
+					t=easeoutexpo(t)
+					line(x,y,x+30*t,y)
+					line(x,y,x-30*t,y)
+					line(x,y,x,y+30*t)
+					line(x,y,x,y-30*t)
+					circfill(x,y,t*4)
 				end
 			end,
 			
@@ -1554,8 +1592,10 @@ function initplayers()
 			end,
 			
 			spawn=function(_ENV)
-				x,a,dx,dy,charge,gun=64,-.1,0,0,fullcharge,0
+				a,dx,dy,charge,gun=-.1,0,0,fullcharge,0
 				y=id==0 and 32 or 16
+				x=id==0 and 64 or 72
+				spawnticks=16
 			end,
 			
 			death=function(_ENV,cause)
@@ -1566,6 +1606,7 @@ function initplayers()
 					l.dr=rnd(.05) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
 					local ang=atan2(l.midx-x,l.midy-y)
 					l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
+					l.t=rndr(120,150)
 					add(deathlines,l)
 				end
 				
@@ -1579,12 +1620,13 @@ function initplayers()
 					local ang=atan2(z.x-x,z.y-y)
 					z.dx+=cos(ang)*0.1
 					z.dy+=sin(ang)*0.1
+					z.t=rndr(120,150)
 					add(deathpnts,z)
 				end
 			end,
 			
 			renderdeath=function(_ENV)
-				color(7)
+				color(pcolor)
 				for l in all(deathlines) do
 					l.midx+=l.dx
 					l.midy+=l.dy
@@ -1593,10 +1635,14 @@ function initplayers()
 										l.midy-sin(l.r)*3,
 										l.midx+cos(l.r)*3,
 										l.midy+sin(l.r)*3)
+					l.t-=1
+					if l.t<0 then del(deathlines,l) end
 				end
 				for z in all(deathpnts) do
 					z.x+=z.dx z.y+=z.dy
 					pset(z.x,z.y)
+					z.t-=1
+					if z.t<0 then del(deathpnts,z) end
 				end
 			end,
 		},{__index=_ENV}))
@@ -1619,41 +1665,19 @@ function blink_anim(x1,y1,x2,y2)
 	end
 end
 
---player enter
-function penter(x,y,duration)
---	local start=tick
---	local t=0
---	local dur=duration/2
---	sfx(18)
---	while t<1 do
---		t=(tick-start)/dur
---		t=easeoutexpo(t)
---		color(7)
---		line(x,y,x+30*t,y)
---		line(x,y,x-30*t,y)
---		line(x,y,x,y+30*t)
---		line(x,y,x,y-30*t)
---		circfill(x,y,t*4)
---		yield()
---	end
---	start=tick
---	t=0
---	while t<1 do
---		t=(tick-start)/dur
---		t=easeoutexpo(t)
---		line(x,y,x+30*(1-t),y)
---		line(x,y,x-30*(1-t),y)
---		line(x,y,x,y+30*(1-t))
---		line(x,y,x,y-30*(1-t))
---		circfill(x,y,(1-t)*6,7)
---		yield()
---	end
+function closestplayer(t)
+	if not ps[2].playing or (ps[2].playing and not ps[2].enabled) then
+		return ps[1]
+	else
+		local dist1=distt(t,ps[1])
+		local dist2=distt(t,ps[2])
+		return dist1<dist2 and ps[1] or ps[2]
+	end
 end
 -->8
 --title screen
 function title_setup()
-	lz={}	zs={} hs={} rs={} fs={} 
---	b.enabled=false b.parts={} 
+	clearlevel()
 	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
@@ -1773,8 +1797,8 @@ function title_setup()
 		yield()
 	end
 	dset(2,difficulty)
---	lvl=12
-	if difficulty==1 then lvl=0 else lvl=1 end
+	lvl=6
+--	if difficulty==1 then lvl=0 else lvl=1 end
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
