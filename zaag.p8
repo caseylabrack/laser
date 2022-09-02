@@ -22,7 +22,6 @@ laserspeeds={.005,.004,.003}
 ps= {} --players
 lz= {} --lasers
 zs= {} --safe zones
-hs= {} --homing bombs
 as= {} --animations (coroutines)
 a2= {} --animations in draw phase
 fs= {} --flowers
@@ -265,76 +264,13 @@ for p in all(ps) do
 	p:update()
 end
 
---for i,p in pairs(ps) do
---	
---if p.enabled then
---	p.charge+=1 p.gun=min(p.gun+1,p.gunfull)
---	if btn(➡️,i) then p.a=p.a-p.rt end
---	if btn(⬅️,i) then p.a=p.a+p.rt end
---	if btn(⬇️,i) then
---		if tick-p.fliplast>p.flipready then
---		 p.a+=.5
---		 p.fliplast=tick
---	 end
---	end
---	if btn(thrust_btn,i) then
---		p.dx+=cos(p.a)*p.t
---		p.dy+=sin(p.a)*p.t
---		if not p.thrusting then
---			p.thrusting=true
---			sfx(2)
---		end
---	else
---		sfx(2,-2)
---		p.thrusting=false
---	end
---	if btn(⬆️,i) then
---	 if p.charge>p.fullcharge then
---			local x1,y1=p.x,p.y
---			p.x+=cos(p.a)*p.hop
---			p.y+=sin(p.a)*p.hop
---			p.thrusting=false
---			blink=cocreate(blink_anim)
---			coresume(blink,x1,y1,p.x,p.y)
---			p.charge=0
---			sleep=8
---			sfx(22)
---		else
---			if tick-p.hopfailtick>2 then
---				p.hopfail=true
---				sfx(12)
---				p.hopfailtick=tick
---			end
---		end
---	end
---	if btn(fire_btn,i) and not b.enabled then
---		if p.gun==p.gunfull then
---			b.enabled=true
---			b.x=p.x b.y=p.y b.a=p.a
---			b.dx=cos(b.a)*b.speed b.dy=sin(b.a)*b.speed
---			sfx(20)
-----		sfx(25)
---		else
---			if tick-p.gunfailtick>2 then
---				p.gunfail=true
---				sfx(12)
---				p.gunfailtick=tick
---			end
---		end
---	end
---end
---p.x+=p.dx
---p.y+=p.dy
---p.dx*=p.friction
---p.dy*=p.friction
---
---end
-
 --flowers
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
---		if p.enabled and touching(p,l) then died(l) end
+	for p in all(ps) do
+		if p.enabled and touching(p,l) then died(p,l) end
+	end
 		l.growcount+=1
 		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
@@ -346,11 +282,11 @@ for f in all(fs) do
 	if f.tick%150==0 and #f<f.max then --bud
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
-			local k={}
-			local ang=0
-			local colliding=true
-			local i=0
-			local l={}
+			local k,ang,colliding,i,l={},0,true,0,{}
+--			local ang=0
+--			local colliding=true
+--			local i=0
+--			local l={}
 			while colliding and i<100 do
 				i+=1
 				l=rnd(couldbuds)
@@ -386,8 +322,7 @@ end
 -- laser move
 for l in all(lz) do
 	l.a-= l.speed
-	l.x = 64+cos(l.a)*63
-	l.y = 64+sin(l.a)*63
+	l.x,l.y=64+cos(l.a)*63,64+sin(l.a)*63
 	
 	if #zs>0 and zs[1].state~="moving" then
 		local s=zs[1] --safezone
@@ -436,10 +371,10 @@ for z in all(zs) do
 	elseif z.state=="shrinking" then
 		z.t-=.25
 		if z.t<2 then 
-			z.state="moving"
-			z.start=z.a
-			z.dist=rnd(1)
-			z.mstart=tick
+			z.state,z.start,z.dist,z.mstart="moving",z.a,rnd(),tick
+--			z.start=z.a
+--			z.dist=rnd(1)
+--			z.mstart=tick
 		end
 	elseif z.state=="moving" then
 		local pct=min(1,(tick-z.mstart)/z.mdur)
@@ -448,38 +383,19 @@ for z in all(zs) do
 			z.a=z.start+z.dist*pct
 			z.x,z.y=64+cos(z.a)*63,64+sin(z.a)*63
 		else
-			z.t=32
-			z.state="idle"
+			z.t,z.state=32,"idle"
+--			z.state="idle"
 		end
 	end
 end
 
 --homing bomb move
-for h in all(hs) do
-	if h.enabled then
-		local a=1
---		local a=atan2(p.x-h.x+rnd(4)-2,p.y-h.y+rnd(4)-2)
-		h.dx+=cos(a)*h.t	 h.dy+=sin(a)*h.t
-		h.frametick+=1
-	else
-		h.timer-=1
-		if h.timer<0 then h.enabled=true end
---		sfx(3)
-	end
-	h.dx*=.97 h.dy*=.97
-	h.x+=h.dx	h.y+=h.dy
-	local a2=atan2(h.x-64,h.y-64)
-	if dist(h.x,h.y,64,64)<8 then
-		h.x=inner.x+cos(a2)*8
-		h.y=inner.y+sin(a2)*8
-	end
-	if dist(h.x,h.y,64,64)>63 then
-		h.x=64+cos(a2)*63
-		h.y=64+sin(a2)*63
-	end
-end
+h:update()
 
 for p in all(ps) do
+	
+	if not p.playing then break end
+
 	local ang=atan2(p.x-64,p.y-64)
 	
 -- player vs outside wall
@@ -499,8 +415,8 @@ for p in all(ps) do
 		end
 	
 		--player vs. homing bombs
-		for h in all(hs) do
-			if (touching(p,h)) died(p,h)
+		if touching(p,h) then 
+			died(p,h)
 		end
 		
 		--player vs. boss
@@ -557,11 +473,9 @@ for b in all(bs) do
 	b:doparticles()
 
 	if b.enabled then
-		local x1=b.x
-		local y1=b.y
+		local x1,y1=b.x,b.y
 		for i=1,5 do
-			b.x=x1+b.dx*i/5
-			b.y=y1+b.dy*i/5
+			b.x,b.y=x1+b.dx*i/5,y1+b.dy*i/5
 			add(b.parts,
 			{x=b.x,y=b.y,t=rnd(3)})
 			for f in all(fs) do --flowers
@@ -601,16 +515,13 @@ for b in all(bs) do
 					goto donebullet
 				end
 			end
-			for h in all(hs) do --homing
-				if touching(h,b) then
-					b.enabled=false sfx(20,-2)
-					b:splash()
-	--				sfx(21)
-					h.enabled=false
-					h.timer=dmg[difficulty].bomb
-					h.dx+=b.dx/4	h.dy+=b.dy/4
-					goto donebullet
-				end
+			if touching(h,b) then
+				b.enabled=false sfx(20,-2)
+				b:splash()
+				h.stunned=true
+				h.timer=dmg[difficulty].bomb
+				h.dx+=b.dx/4	h.dy+=b.dy/4
+				goto donebullet
 			end
 			if boss.enabled and touching(boss,b) then
 				boss.hp-=dmg[difficulty].boss
@@ -622,8 +533,6 @@ for b in all(bs) do
 			if touching(inner,b) or distt(inner,b)>63 then
 				b.enabled=false sfx(20,-2)
 				b:splash()
-	--			sfx(25)
-	--			sfx(21)
 				goto donebullet
 			end
 		end
@@ -802,13 +711,7 @@ if state~="dead" and inner.enabled then
 end
 
 --homing bombs
-for h in all(hs) do
-	if h.enabled then
-	spr((flr(h.frametick%8)/2)+16,h.x-4,h.y-4)
-	else
-	spr(23,h.x-4,h.y-4)
-	end
-end
+h:render()
 
 --player
 for p in all(ps) do
@@ -998,19 +901,12 @@ end
 
 function spawn()
 	state="setup"
-	i=10 c=15
-	sfx(18)--player spawn noise
+	i,c=10,22
 	for p in all(ps) do
 		p:spawn()
 	end
 
-	--player entering animation
---	local enteranim=cocreate(penter)
---	coresume(enteranim,ps[1].x,ps[1].y,c)
---	add(a2,enteranim)
 	while c>0 do c-=1 yield() end
---	ps[1].enabled=true
-	for p in all(ps) do p.enabled=true end
 	inner.enabled=true
 	--spawn each unit type in random order
 	for unit,num in pairs(lvls[lvl]) do
@@ -1047,12 +943,13 @@ function spawn()
 				if #lz==num then break end
 			end
 			if unit=="bomb" then
-				local a=aim_away(.25,.6)
-				local d=rnd(64-24)+12
-				add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
-								r=3,dx=0,dy=0,t=.05,
-								enabled=true,timer=0,
-								frametick=0})
+				h:spawn()
+--				local a,d=aim_away(.25,.6),rnd(64-24)+12
+--				h.x,h.y,h.enabled,h.timer,h.frametick,h.stunned=64+cos(a)*d,64+sin(a)*d,true,0,0,false
+--				add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
+--								r=3,dx=0,dy=0,t=.05,
+--								enabled=true,timer=0,
+--								frametick=0})
 				sfx(9)
 				break
 			end
@@ -1293,7 +1190,7 @@ function gamewin_anim()
 end
 
 function clearlevel()		
-		lz={}	zs={} hs={} rs={} fs={}
+		lz={}	zs={} h.enabled=false rs={} fs={}
 		for b in all(bs) do
 			b.enabled=false b.parts={}
 		end 
@@ -1414,7 +1311,57 @@ function smallcaps(s)
 end
 
 -->8
---palletes and misc animations
+--misc
+
+--homing bomb
+h=setmetatable({
+			r=3,dx=0,dy=0,t=.05,
+			enabled=false,timer=0,
+			frametick=0,
+			spawn=function(_ENV)
+				local a,d=aim_away(.25,.6),rnd(64-24)+12
+				x,y,dx,dy,enabled,
+				timer,frametick,stunnned=
+				64+cos(a)*d,64+sin(a)*d,0,0,
+				true,0,0,false
+			end,
+			
+			update=function(_ENV)
+				if enabled then
+					if stunned then
+						timer-=1
+						if timer<0 then stunned=false end
+					else
+						local target=closestplayer(h)
+						local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+						dx+=cos(a)*t dy+=sin(a)*t
+						frametick+=1
+					end
+					dx*=.97 dy*=.97
+					x+=dx	y+=dy
+					local a2=atan2(x-64,y-64)
+					if dist(x,y,64,64)<8 then
+						x,y=64+cos(a2)*8,64+sin(a2)*8
+					end
+					if dist(x,y,64,64)>63 then
+						x,y=64+cos(a2)*63,64+sin(a2)*63
+					end
+				end
+			end,
+			
+			render=function(_ENV)
+				if enabled then
+					if stunned then
+						spr(23,x-4,y-4)
+					else
+						spr((flr(frametick%8)/2)+16,x-4,y-4)
+					end
+				end
+			end,
+		},{__index=_ENV})
+
+
+--palettes
 dp={ --default
 [0]=0,1,2,3,
 4,5,6,7,
@@ -1554,6 +1501,10 @@ function initplayers()
 					end
 				end
 				
+				if spawnticks==8 and id==0 then 
+						sfx(18)--player spawn noise
+				end
+				
 				if spawnticks>0 then
 					spawnticks-=1
 					color(pcolor)
@@ -1596,6 +1547,7 @@ function initplayers()
 				y=id==0 and 32 or 16
 				x=id==0 and 64 or 72
 				spawnticks=16
+				enabled=true
 			end,
 			
 			death=function(_ENV,cause)
@@ -1665,14 +1617,12 @@ function blink_anim(x1,y1,x2,y2)
 	end
 end
 
+--always returns either p1 or p2
 function closestplayer(t)
-	if not ps[2].playing or (ps[2].playing and not ps[2].enabled) then
-		return ps[1]
-	else
-		local dist1=distt(t,ps[1])
-		local dist2=distt(t,ps[2])
-		return dist1<dist2 and ps[1] or ps[2]
-	end
+	if not ps[2].playing then return ps[1] end
+	if not ps[2].enabled then return ps[1] end
+	if not ps[1].enabled then return ps[2] end	
+	return distt(t,ps[1])<distt(t,ps[2]) and ps[1] or ps[2]
 end
 -->8
 --title screen
@@ -1682,12 +1632,13 @@ function title_setup()
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
 --	add(lz,{a=.5,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
-	local a=aim_away(.25,.6)
-	local d=rnd(64-24)+12
-	add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
-					r=3,dx=0,dy=0,t=.05,
-					enabled=true,timer=0,
-					frametick=0})
+--	local a=aim_away(.25,.6)
+--	local d=rnd(64-24)+12
+	h:spawn()
+--	add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
+--					r=3,dx=0,dy=0,t=.05,
+--					enabled=true,timer=0,
+--					frametick=0})
 	for i=1,5 do
 		local f={}
 		f.tick=flr(rnd(100))
