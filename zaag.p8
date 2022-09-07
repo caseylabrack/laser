@@ -6,10 +6,16 @@ __lua__
 
 -- todo:
 --  2p
+--   enabling 2p
+--   boss hp display
+--   different color bullets?
+--  "press ❎" title screen
 --  more sounds esp level transition
 --  game win: promenade. intro: gnome. boss: meno mosso
+--  timer
 --  improve level transition. particles? faux 3d (tempest)? ship zooms in (tempest)? 
 --  different rocket trail
+--  homing bomb eye track
 --  gun ready animation maybe
 
 version=34
@@ -27,11 +33,6 @@ a2= {} --animations in draw phase
 fs= {} --flowers
 rs= {} --roids
 bs= {} --bullets
-boss = {enabled=false,
-								r=3,steadyx=64,steadyy=64,lasthit=-100,
-								spawnnum=3,finalsize=10,
-								growdur=80,
-								floor={x=64,y=64,r=18}}
 inner = {x=64,y=64,r=6,enabled=true}
 outer = {x=64,y=64,r=63,enabled=true}
 lvl=12
@@ -185,80 +186,7 @@ if sleep>0 then
 	return
 end
 
-if boss.enabled then
-	local targetplayer=closestplayer(boss)
-	local towardplayer=atan2(targetplayer.x-64,targetplayer.y-64)
-	--boss attack
-	if boss.state=="spawn" then
-		if #boss.bulges<boss.spawnnum then
-			local b={}
-			b.r=0
-			b.finalr=5+rnd()*5
-			local a=rnd()
-			b.x=64+cos(a)*8
-			b.y=64+sin(a)*8
-			b.tx,b.ty=b.x,b.y --target position it can vibrate around
-			add(boss.bulges,b)
-			boss.state="grow"
-			boss.start=0
-		else
-			boss.state="warn"
-			boss.start=0
-		end
-	elseif boss.state=="grow" then
-		if boss.start<boss.growdur then
-			boss.start+=1
-			local pct=boss.start/boss.growdur
-			local spawnling=boss.bulges[#boss.bulges]
-			spawnling.r=pct*spawnling.finalr
-		else
-			boss.state="spawn"
-		end
-	elseif boss.state=="warn" then
-		if boss.start<30 then
-			boss.start+=1
-			local pct=boss.start/30
-			for bulge in all(boss.bulges) do
-				local a,d=rnd(),pct*3
-				bulge.x,bulge.y=bulge.tx+cos(a)*d,bulge.ty+sin(a)*d
-			end
-		else
-			boss.state="fire"
-		end
-	elseif boss.state=="fire" then
-		for bulge in all(boss.bulges) do
-			local spd=rnd(1.25)+.5
-			local a=towardplayer+rndr(-.1,.1)
-			add(rs,{x=bulge.tx,y=bulge.ty,
-											dx=cos(a)*spd,dy=sin(a)*spd,
-											r=bulge.r,enabled=true,hit=-10})
-			boss.bulges={}	
-		end
-		boss.state="spawn"
-	elseif boss.state=="intro" then
-		if boss.start<60 then
-			boss.start+=1
-			boss.r=boss.finalsize*boss.start/60
-		else
-			boss.state="spawn"
-			boss.start=0
-		end
-	end
-	--boss eye
-		--lazy follow
-	if boss.state~="intro" then
-		local rx,ry=64+cos(towardplayer)*7,64+sin(towardplayer)*7
-		local dx,dy=rx-boss.steadyx,ry-boss.steadyy
-		dx*=.05 dy*=.05
-		boss.steadyx+=dx boss.steadyy+=dy
-			--bob around
-		local modx=cos(t()/2+.7)*3
-		local mody=cos(t()/3)*3
-			--final pos	
-		boss.x,boss.y=boss.steadyx+modx,boss.steadyy+mody
-	end
-		log=boss.hp
-end
+boss:update()
 
 for p in all(ps) do
 	p:update()
@@ -283,10 +211,6 @@ for f in all(fs) do
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
 			local k,ang,colliding,i,l={},0,true,0,{}
---			local ang=0
---			local colliding=true
---			local i=0
---			local l={}
 			while colliding and i<100 do
 				i+=1
 				l=rnd(couldbuds)
@@ -372,9 +296,6 @@ for z in all(zs) do
 		z.t-=.25
 		if z.t<2 then 
 			z.state,z.start,z.dist,z.mstart="moving",z.a,rnd(),tick
---			z.start=z.a
---			z.dist=rnd(1)
---			z.mstart=tick
 		end
 	elseif z.state=="moving" then
 		local pct=min(1,(tick-z.mstart)/z.mdur)
@@ -415,7 +336,7 @@ for p in all(ps) do
 		end
 	
 		--player vs. homing bombs
-		if touching(p,h) then 
+		if h.enabled and touching(p,h) then 
 			died(p,h)
 		end
 		
@@ -443,7 +364,6 @@ for p in all(ps) do
 		end
 	end
 end
-
 
 --bouncing around
 for v in all(rs) do
@@ -515,7 +435,7 @@ for b in all(bs) do
 					goto donebullet
 				end
 			end
-			if touching(h,b) then
+			if h.enabled and touching(h,b) then
 				b.enabled=false sfx(20,-2)
 				b:splash()
 				h.stunned=true
@@ -639,11 +559,8 @@ end
 --safe zone
 for z in all(zs) do
 	if z.state=="idle" or z.state=="shrinking" then
---	fillp(░)
 	fillp(32125)
---	fillp(0b0101101001011010)
 	circfill(z.x,z.y,z.r,0x01)
---	circfill(z.x,z.y,z.r,0x0c)
 	fillp()
 	circfill(z.x,z.y,z.r-z.t,0)
 	circ(z.x,z.y,z.r,1)
@@ -700,7 +617,7 @@ end
 --boss flower
 if boss.enabled then
 	fillp(ˇ)
-	circfill(boss.floor.x,boss.floor.y,boss.floor.r*(1-boss.t),11)
+	circfill(boss.floor.x,boss.floor.y,boss.floor.r*(1-boss.detht),11)
 	fillp()
 end
 
@@ -733,49 +650,7 @@ for v in all(rs) do
 end
 
 --boss
-if boss.enabled then
-
-	for bulge in all(boss.bulges) do
-		circfill(bulge.x,bulge.y,bulge.r,0)
-		circ(bulge.x,bulge.y,bulge.r,9)
-	end
-	local c=tick-boss.lasthit<10 and 7 or 15
-	local hit=tick-boss.lasthit<10
-	local bosscolor=14
-	local hitcolor=8
-	local flickerrate=4
-	if hit then 
-		if tick%flickerrate<flickerrate/2 then
-			pal(bosscolor,8)
-		end
-	end
-	
-	local targetplayer=closestplayer(boss)
-	local top=atan2(targetplayer.x-boss.x,targetplayer.y-boss.y)
-	local x,y,x2,y2=0,52,20,72
-	palt(0,false)
-	palt(10,true)
-	local wid=x2-x
-	local scale=wid*(1-boss.t)
-	if boss.t>.33 then pal(bosscolor,2) end
-	if boss.t>.66 then pal(bosscolor,1) end
-	sspr(x,y,wid,wid,
-	boss.x-scale/2,boss.y-scale/2,
-	scale,scale)
-	palt()
-
-	-- if boss dying,center eye elements
-	local lidr,pupr=boss.t==0 and 2 or 0,boss.t==0 and 5 or 0
-
-	circ(boss.x+cos(top)*lidr,boss.y+sin(top)*lidr,(boss.r-4)*(1-boss.t),bosscolor)
-	if boss.t<.33 and boss.t<1 then
-		spr(20,boss.x-3+cos(top)*pupr,boss.y-3+sin(top)*pupr)
-	else
-		local r=6*(1-boss.t)
-		circ(boss.x-r/2,boss.y-r/2,r,8)
-	end
-	pal(cp)
-end
+boss:render()
 
 --bullet
 for b in all(bs) do
@@ -790,7 +665,7 @@ pal()
 
 if state=="running" then
 	--gun countdown
-	local p=ps[1]
+	local p=ps[2].playing and ps[2].enabled and ps[2] or ps[1]
 	local x,y,x2,y2=97,0,127,8
 	local pct=min(p.gun/p.gunfull,1)
 	local f=p.gun<p.gunfull and 1 or 12
@@ -970,12 +845,7 @@ function spawn()
 				if #fs==num then break end
 			end
 			if unit=="boss" then
-				boss.enabled=true
-				boss.bulges={}
-				boss.x,boss.y,boss.r,boss.hp=64,64,10,360
-				boss.state="spawn"
-				boss.start=0
-				boss.t=0
+				boss:spawn()
 				sfx(8)
 				break
 			end
@@ -1148,7 +1018,7 @@ function gamewin_anim()
 		i-=1
 
 		local pct=1-i/90	
-		boss.t=pct	
+		boss.detht=pct	
 		local dx,dy=64-boss.steadyx,64-boss.steadyy
 		dx*=.1
 		dy*=.1
@@ -1184,7 +1054,7 @@ function gamewin_anim()
 
 		yield()
 	end	
-	p.enabled=false
+	ps[1].enabled,ps[2].enabled=false,false
 	state="title"
 	title=cocreate(title_setup)
 end
@@ -1415,7 +1285,7 @@ function initplayers()
 		add(ps,
 			setmetatable({
 			playing=true,id=i-1,--plyrs 0 and 1
-			pcolor=i==1 and 7 or 15,
+			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,
 			a=.75,t=.25,rt=.05,r=3,friction=.92,
 			hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
@@ -1748,13 +1618,144 @@ function title_setup()
 		yield()
 	end
 	dset(2,difficulty)
-	lvl=6
+	lvl=12
 --	if difficulty==1 then lvl=0 else lvl=1 end
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
 	wipe=cocreate(wipe_anim)
 end
+-->8
+-- boss
+boss =
+setmetatable({
+enabled=false,
+r=3,steadyx=64,steadyy=64,lasthit=-100,
+spawnnum=3,finalsize=10,
+growdur=80,detht=0,
+floor={x=64,y=64,r=18},
+	
+update=function(_ENV)
+	if not enabled then return end
+	local targetplayer=closestplayer(boss)
+	local towardplayer=atan2(targetplayer.x-64,targetplayer.y-64)
+	if state=="spawn" then
+		if #bulges<spawnnum then
+			local b={}
+			b.r,b.finalr=0,5+rnd()*5
+			local a=rnd()
+			b.x,b.y=64+cos(a)*8,64+sin(a)*8
+			b.tx,b.ty=b.x,b.y --target position it can vibrate around
+			add(bulges,b)
+			state="grow"
+			start=0
+		else
+			state="warn"
+			start=0
+		end
+	elseif state=="grow" then
+		if start<growdur then
+			start+=1
+			local pct=start/growdur
+			local spawnling=bulges[#bulges]
+			spawnling.r=pct*spawnling.finalr
+		else
+			state="spawn"
+		end
+	elseif state=="warn" then
+		if start<30 then
+			start+=1
+			local pct=start/30
+			for bulge in all(bulges) do
+				local a,d=rnd(),pct*3
+				bulge.x,bulge.y=bulge.tx+cos(a)*d,bulge.ty+sin(a)*d
+			end
+		else
+			state="fire"
+		end
+	elseif state=="fire" then
+		for bulge in all(bulges) do
+			local spd=rnd(1.25)+.5
+			local a=towardplayer+rndr(-.1,.1)
+			add(rs,{x=bulge.tx,y=bulge.ty,
+											dx=cos(a)*spd,dy=sin(a)*spd,
+											r=bulge.r,enabled=true,hit=-10})
+			bulges={}	
+		end
+		state="spawn"
+	elseif state=="intro" then
+		if start<60 then
+			start+=1
+			r=finalsize*start/60
+		else
+			state="spawn"
+			start=0
+		end
+	end
+	if state~="intro" then
+		local rx,ry=64+cos(towardplayer)*7,64+sin(towardplayer)*7
+		local dx,dy=rx-steadyx,ry-steadyy
+		dx*=.05 dy*=.05
+		steadyx+=dx steadyy+=dy
+			--bob around
+		local modx=cos(time()/2+.7)*3
+		local mody=cos(time()/3)*3
+			--final pos	
+		x,y=steadyx+modx,steadyy+mody
+	end
+end,
+
+render=function(_ENV)
+	if not enabled then return end
+
+	for bulge in all(bulges) do
+		circfill(bulge.x,bulge.y,bulge.r,0)
+		circ(bulge.x,bulge.y,bulge.r,9)
+	end
+	local c=tick-lasthit<10 and 7 or 15
+	local hit=tick-lasthit<10
+	local bosscolor=14
+	local hitcolor=8
+	local flickerrate=4
+	if hit then 
+		if tick%flickerrate<flickerrate/2 then
+			pal(bosscolor,8)
+		end
+	end
+	
+	local targetplayer=closestplayer(boss)
+	local top=atan2(targetplayer.x-x,targetplayer.y-y)
+	local x1,y1,x2,y2=0,52,20,72
+	palt(0,false)
+	palt(10,true)
+	local wid=x2-x1
+	local scale=wid*(1-detht)
+	if detht>.33 then pal(bosscolor,2) end
+	if detht>.66 then pal(bosscolor,1) end
+	sspr(x1,y1,wid,wid,
+	x-scale/2,y-scale/2,
+	scale,scale)
+	palt()
+
+	-- if boss dying,center eye elements
+	local lidr,pupr=detht==0 and 2 or 0,detht==0 and 5 or 0
+
+	circ(x+cos(top)*lidr,y+sin(top)*lidr,(r-4)*(1-detht),bosscolor)
+	if detht<.33 and detht<1 then
+		spr(20,x-3+cos(top)*pupr,y-3+sin(top)*pupr)
+	else
+		local r=4*(1-detht)-1
+		circ(x-r/2,y-r/2,r,8)
+	end
+	pal(cp)
+end,
+
+spawn=function(_ENV)
+	enabled,bulges=true,{}
+	x,y,r,hp=64,64,10,36
+	state,start,detht="spawn",0,0
+end,
+},{__index=_ENV})
 __gfx__
 00000000006dd60000000000000000000000000000c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
 0000000006666660000000000e0000e00e0000e00c0cc0c00202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
@@ -1764,14 +1765,14 @@ __gfx__
 0070070066dddd660008000000eeee0000eeee00c0c66c0c20222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
 0000000006666660000000000e0000e00e0000e00c0cc0c0020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
 00000000006dd60000000000000000000000000000c00c000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
-0f00000000f00000000f00000000f0000008000000eee00000700000f000000f0000000000000000000000000000000000000000100000000000000000000000
-00f0000f000f00000000f00000000f00008080000e00eee0007000000f0000f00000000000000000000000000000000000000011710000000000000000000000
-00fffff000ffff0f00ffff000fffff0008eee800e00000ee0777000000ffff000000000000000000011110000000000000000177710000000000000000000000
-00f88f0000f88ff00ff88f0ff0f88f0080e8e080e000000e7707700000f22f000000000000000001177771000000000000001177710000000000000000000000
-00f88f000ff88f00f0f88ff000f88f0f08eee800e00000ee7000700000f22f000000000000000117777777100000000000001777710000000000000000000000
-0fffff00f0ffff0000ffff0000fffff0008080000e000ee00000000000ffff000000000000011777777777100000000000011777710000000011111000000000
-f0000f000000f000000f000000f00000000800000ee0ee00000000000f0000f00000000000177777777771100000000000017717710000000177771000000000
-000000f000000f000000f000000f000000000000000ee00000000000f000000f0000000000177777777771000000000000117717710000001777777100000000
+0e00000000e00000000e00000000e0000008000000eee00000700000e000000e0000000000000000000000000000000000000000100000000000000000000000
+00e0000e000e00000000e00000000e00008080000e00eee0007000000e0000e00000000000000000000000000000000000000011710000000000000000000000
+00eeeee000eeee0e00eeee000eeeee0008eee800e00000ee0777000000eeee000000000000000000011110000000000000000177710000000000000000000000
+00e80e0000e80ee00ee80e0ee0e80e0080e8e080e000000e7707700000e00e000000000000000001177771000000000000001177710000000000000000000000
+00e00e000ee00e00e0e00ee000e00e0e08eee800e00000ee7000700000e00e000000000000000117777777100000000000001777710000000000000000000000
+0eeeee00e0eeee0000eeee0000eeeee0008080000e000ee00000000000eeee000000000000011777777777100000000000011777710000000011111000000000
+e0000e000000e000000e000000e00000000800000ee0ee00000000000e0000e00000000000177777777771100000000000017717710000000177771000000000
+000000e000000e000000e000000e000000000000000ee00000000000e000000e0000000000177777777771000000000000117717710000001777777100000000
 000000000000000001011010000000000000000000000f000f000000000000000000000001777777777771001111000000177717710000017777777100000000
 05555500088888000011110000000000000000000000ffffffff0000000000000000000001777771177710017771100001177117710000177777777100000000
 5505055088080880011001100000000000007000000fff0000ff0f00000000000000000017777111777710017777100001777117710000177777771000000000
