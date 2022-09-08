@@ -6,19 +6,19 @@ __lua__
 
 -- todo:
 --  2p
---   enabling 2p
---   boss hp display
 --   different color bullets?
---  "press ❎" title screen
+--  boss hp display
 --  more sounds esp level transition
---  game win: promenade. intro: gnome. boss: meno mosso
---  timer
+--  game startup: gnome
+--  game win: promenade. boss: meno mosso
+--  timer shown on win
 --  improve level transition. particles? faux 3d (tempest)? ship zooms in (tempest)? 
 --  different rocket trail
 --  homing bomb eye track
 --  gun ready animation maybe
 
 version=34
+_g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
 	{roid=1.5,flower=1.5,bomb=45,boss=3},--normal
@@ -181,10 +181,10 @@ if state=="setup" or state=="wipe" or state=="win" then
 end
 
 --pauses most game logic for a number of frames
-if sleep>0 then
-	sleep-=1
-	return
-end
+--if sleep>0 then
+--	sleep-=1
+--	return
+--end
 
 boss:update()
 
@@ -819,12 +819,6 @@ function spawn()
 			end
 			if unit=="bomb" then
 				h:spawn()
---				local a,d=aim_away(.25,.6),rnd(64-24)+12
---				h.x,h.y,h.enabled,h.timer,h.frametick,h.stunned=64+cos(a)*d,64+sin(a)*d,true,0,0,false
---				add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
---								r=3,dx=0,dy=0,t=.05,
---								enabled=true,timer=0,
---								frametick=0})
 				sfx(9)
 				break
 			end
@@ -1284,7 +1278,7 @@ function initplayers()
 	for i=1,2 do
 		add(ps,
 			setmetatable({
-			playing=true,id=i-1,--plyrs 0 and 1
+			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,
 			a=.75,t=.25,rt=.05,r=3,friction=.92,
@@ -1308,14 +1302,14 @@ function initplayers()
 				end
 				if btn(⬆️,id) then
 				 if charge>fullcharge then
-						local x1,y1=x,y
+						local lines=coords(_ENV)
 						x+=cos(a)*hop
 						y+=sin(a)*hop
 						thrusting=false
---						blink=cocreate(blink_anim)
---						coresume(blink,x1,y1,p.x,p.y)
+						_g.blink=cocreate(blink_anim)
+						coresume(blink,lines)
 						charge=0
---						sleep=8
+--						if ps[2].playing==false then _g.sleep=8 end
 						sfx(22)
 					else
 						if tick-hopfailtick>2 then
@@ -1413,6 +1407,7 @@ function initplayers()
 			end,
 			
 			spawn=function(_ENV)
+				if not playing then return end
 				a,dx,dy,charge,gun=-.1,0,0,fullcharge,0
 				y=id==0 and 32 or 16
 				x=id==0 and 64 or 72
@@ -1471,18 +1466,15 @@ function initplayers()
 	end
 end
 
-function blink_anim(x1,y1,x2,y2)
+function blink_anim(lines)
 	local grays,duration={7,6,13,1},8
 	while duration>=0 do
 		local pct=(8-duration)/8
 		local idx=ceil(pct*#grays)
-		p.x,p.y=x1,y1
-		local lines=p:coords()
 		for l in all(lines) do
 			line(l.x1,l.y1,l.x2,l.y2,grays[idx])
 		end
 		duration-=1
-		p.x,p.y=x2,y2
 		yield()
 	end
 end
@@ -1501,23 +1493,14 @@ function title_setup()
 	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
---	add(lz,{a=.5,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
---	local a=aim_away(.25,.6)
---	local d=rnd(64-24)+12
 	h:spawn()
---	add(hs,{x=64+cos(a)*d,y=64+sin(a)*d,
---					r=3,dx=0,dy=0,t=.05,
---					enabled=true,timer=0,
---					frametick=0})
 	for i=1,5 do
 		local f={}
-		f.tick=flr(rnd(100))
-		f.max=12
+		f.tick,f.max=flr(rnd(100)),12
 		f.growgoal=120 --grow rate
 		f.br=500 --bud rate
 		local r={}
-		local d=12+rnd(63-24)
-		local a=rnd()
+		local d,a=12+rnd(63-24),rnd()
 		r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
 		r.growcount=rnd(f.growgoal) r.hit=-100
 		add(f,r)
@@ -1525,30 +1508,24 @@ function title_setup()
 	end
 	local z=flr(rnd(10))+3
 	for i=1,z do
-		local r={}
-		local a=rnd()
-		local d=rnd(64-24)+12
-		r.x=64+cos(a)*d r.y=64+sin(a)*d
-		local a2=rnd()
-		local spd=rnd(1.25)+.5
-		r.dx=cos(a2)*spd r.dy=sin(a2)*spd
-		r.r=3+rnd(8-3) r.enabled=true
-		r.hit=-10
+		local r,a,d={},rnd(),rnd(64-24)+12
+		r.x,r.y=64+cos(a)*d,64+sin(a)*d
+		local a2,spd=rnd(),rnd(1.25)+.5
+		r.dx,r.dy=cos(a2)*spd,sin(a2)*spd
+		r.r,r.enabled,r.hit=3+rnd(8-3),true,-10
 		add(rs,r)
 	end
 	yield()
 	
-	local c=0
 	local col1,col2={14,8,2,1},{1,2,8,14}
-	local frate=.1
-	local scany=0
-	local dd=10--sleep input
-	local haspressed=false
+	local frate,scany,
+							haspressed,c=.1,0,false,0
+	
 	while c<30 or not ((btn(❎) or btn(🅾️)) and haspressed) do
 		c+=1
 --give the bomb something to chase
-		if rnd()>.9 then 
-			ps[1].a,ps[1].x,ps[1].y=rnd(),64+cos(ps[1].a)*63,64+sin(ps[1].a)*63
+		if rnd()>.95 then 
+			ps[1].x,ps[1].y=rnd(128),rnd(128)
 		end
 
 --spritesheet coords
@@ -1579,17 +1556,11 @@ function title_setup()
 
 		--difficulty choose
 		if haspressed then
-			dd-=1
-			if btn()==0 then dd=-1 end
-			if dd<0 then
-				if btn(⬅️) or btn(⬇️) then 
-					difficulty=mid(1,difficulty-1,3)
-					dd=10
-				end
-				if btn(➡️) or btn(⬆️) then
-					difficulty=mid(1,difficulty+1,3)
-					dd=10
-				end
+			if btnp(⬅️) or btn(⬇️) then
+				difficulty=mid(1,difficulty-1,3)
+			end			
+			if btnp(➡️) or btn(⬆️) then
+				difficulty=mid(1,difficulty+1,3)
 			end
 			
 			local xoff,yoff,w,h=14,76,98,20
@@ -1604,22 +1575,34 @@ function title_setup()
 			rect(xoff,yoff,xoff+w,yoff+h,1)
 			cprint(diffmsg[difficulty],64,80,7)
 			cprint(mulmsg[difficulty],64,88,7)
+		else
+--			if tick%90<45 then 
+--				cprint("press ❎",65,115,0)
+				cprint("press ❎",64,114,1)
+--				print("press ❎",0,122,1)  
+--			end
+			if btnp()~=0 then
+				haspressed,c=true,0
+			end
 		end
 		
-		if btn()~=0 and not haspressed then
-			haspressed=true
-			c=10	
+		if btnp()>255 then --bitfield where high bits are p2
+			ps[2].playing=not ps[2].playing
 		end
 		
-		color(1)
-		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
-		print("l"..smallcaps("abrack"),100,122)
-		print(smallcaps("v").."."..version,1,122)
+		print("2p join"..(ps[2].playing and "!" or "?"),
+			96,122,ps[2].playing and 12 or 1)
+		
+		
+--		color(1)
+--		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
+--		print("l"..smallcaps("abrack"),100,122)
+--		print(smallcaps("v").."."..version,1,122)
 		yield()
 	end
 	dset(2,difficulty)
-	lvl=12
---	if difficulty==1 then lvl=0 else lvl=1 end
+--	lvl=12
+	if difficulty==1 then lvl=0 else lvl=1 end
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
