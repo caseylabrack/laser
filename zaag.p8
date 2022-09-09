@@ -5,19 +5,18 @@ __lua__
 -- casey labrack
 
 -- todo:
---  2p
---   different color bullets?
---  boss hp display
 --  more sounds esp level transition
 --  game startup: gnome
+--  different rocket trail
+--  boss hp display
 --  game win: promenade. boss: meno mosso
 --  timer shown on win
 --  improve level transition. particles? faux 3d (tempest)? ship zooms in (tempest)? 
---  different rocket trail
 --  homing bomb eye track
 --  gun ready animation maybe
+--  different color bullets?
 
-version=34
+version=39
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -1591,13 +1590,13 @@ function title_setup()
 		end
 		
 		print("2p join"..(ps[2].playing and "!" or "?"),
-			96,122,ps[2].playing and 12 or 1)
+			96,0,ps[2].playing and 12 or 1)
 		
-		
---		color(1)
---		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
---		print("l"..smallcaps("abrack"),100,122)
---		print(smallcaps("v").."."..version,1,122)
+		color(1)
+		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
+		print("l"..smallcaps("abrack"),100,122)
+
+		print(smallcaps("v").."."..version,1,122)
 		yield()
 	end
 	dset(2,difficulty)
