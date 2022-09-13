@@ -1,8 +1,10 @@
 pico-8 cartridge // http://www.pico-8.com
-version 36
+version 38
 __lua__
 -- zaag
 -- casey labrack
+
+-- an asteroids-like with lasers and mulligans
 
 -- todo:
 --  more sounds esp level transition
@@ -830,7 +832,7 @@ function spawn()
 				local r={}
 				local d=12+rnd(63-24)
 				local a=aim_away(.25,.25)
-				r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
+				r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
 				r.growcount=-rnd(30) r.hit=-100
 				add(f,r)
 				add(fs,f)
@@ -1542,15 +1544,15 @@ function title_setup()
 
 --scan line down the logotype
 		pal()
-		for i=1,4 do
-			local os=sin((scany+i)/100)*sc.h
-			for x=1,sc.w do
-				if sget(sc.x+x,sc.y+os)==7 then				
-					pset(tc.x+x,tc.y+os,os>.5 and col2[i] or col1[i])
-				end
-			end
-		end		
-		scany+=1
+--		for i=1,4 do
+--			local os=sin((scany+i)/100)*sc.h
+--			for x=1,sc.w do
+--				if sget(sc.x+x,sc.y+os)==7 then				
+--					pset(tc.x+x,tc.y+os,os>.5 and col2[i] or col1[i])
+--				end
+--			end
+--		end		
+--		scany+=1
 --		if scany>100 then scany=0 end
 
 		--difficulty choose
