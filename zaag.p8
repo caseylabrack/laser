@@ -7,9 +7,10 @@ __lua__
 -- an asteroids-like with lasers and mulligans
 
 -- todo:
+--  timer shown on win
+--  maybe show timer option
 --  boss hp display
 --  boss intro sound
---  timer shown on win
 --  different rocket trail
 --  gun ready animation maybe
 --  different color bullets?
@@ -55,7 +56,8 @@ shake=0
 pthrusting=false --was anybody making the thrust noise last frame?
 fire_btn=❎
 thrust_btn=🅾️
-screenshake=true
+--screenshake=true
+deathgifs=false
 --coroutines:
 wipe=nil
 blink=nil
@@ -64,6 +66,12 @@ dethmsg=nil
 dethparts=nil
 gamewon=nil
 log=""
+
+--cartdata slots
+--0: action button swap
+--1: death gifs
+--2: last difficulty
+--3: is noob
 
 dethmsgs={
 "zigged when i shoulda zaaged",
@@ -91,12 +99,12 @@ tips={
 }
 
 function _init()
---	music(20)
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
 	fire_btn  = (not swapped) and ❎ or 🅾️ 
 	thrust_btn= (not swapped) and 🅾️ or ❎
-	screenshake=dget(1)==1
+--	screenshake=dget(1)==1
+	deathgifs=dget(1)==1
 	difficulty=dget(2)
 	difficulty=difficulty==0 and 1 or difficulty
 	initplayers()
@@ -145,7 +153,9 @@ function _init()
 	
 	title=cocreate(title_setup)
 	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
-	menuitem(2, "screenshake:"..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(2, "save screenshot", function () extcmd("screen") end)
+	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+--	menuitem(2, "screenshake:"..(screenshake and "on" or "off"), screenshake_toggle)
 end
 
 function btns_toggle()
@@ -158,12 +168,19 @@ function btns_toggle()
 	end 
 end
 
-function screenshake_toggle()
-	screenshake=not screenshake
-	menuitem(2, screenshake==true and "screenshake:on" or "screenshake:off",screenshake_toggle)
-	dset(1,screenshake==true and 1 or 0)
+function dethgiftoggle()
+	deathgifs=not deathgifs
+	dset(1,(deathgifs and 1 or 0))
+	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	return true
 end
+
+--function screenshake_toggle()
+--	screenshake=not screenshake
+--	menuitem(2, screenshake==true and "screenshake:on" or "screenshake:off",screenshake_toggle)
+--	dset(1,screenshake==true and 1 or 0)
+--	return true
+--end
 
 function _update()
 tick+=1
@@ -214,7 +231,7 @@ for f in all(fs) do
 			end
 		end
 	end
-	if f.tick%150==0 and #f<f.max then --bud
+	if f.tick%f.br==0 and #f<f.max then --bud
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
 			local k,ang,colliding,i,l={},0,true,0,{}
@@ -470,13 +487,12 @@ end
 --level win
 if ps[1].enabled or ps[2].enabled then
 	if #rs==0 and #fs==0 and boss.enabled==false and state=="running" then
-	--if #rs==0 and #fs==0 and ps[1].enabled and boss.enabled==false and state=="running" then
 		state="wiping"
 		extralives=mulligans
-	--	sfx(2,-2)
 		ps[1].thrusting,ps[2].thrusting=false,false
 		pthrusting=false
 		sfx(2,-2)
+		if lvl==2 then dset(3,1) end
 		lvl+=1
 		wipe=cocreate(wipe_anim)
 		state="wipe"
@@ -524,16 +540,16 @@ end
 function _draw()
 cls()
 
-if shake > 1 then
-	if screenshake then
-		camera()
-		local a=rnd()
-		camera(cos(a)*shake,sin(a)*shake)
-	end
-	shake*=.75
-else
-	camera()
-end
+--if shake > 1 then
+--	if screenshake then
+--		camera()
+--		local a=rnd()
+--		camera(cos(a)*shake,sin(a)*shake)
+--	end
+--	shake*=.75
+--else
+--	camera()
+--end
 
 pal(cp)
 
@@ -833,12 +849,10 @@ function spawn()
 			end
 			if unit=="flowers" then
 				local f={}
-				f.tick=flr(rnd(10))
-				f.max=9
+				f.tick,f.max=flr(rnd(10)),4
 				f.growgoal=30 --grow rate
-				f.br=250 --bud rate
-				local r={}
-				local d=12+rnd(63-24)
+				f.br=150+flr(rnd(100)) --bud rate
+				local r,d={},12+rnd(63-24)
 				local a=aim_away(.25,.25)
 				r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
 				r.growcount=-rnd(30) r.hit=-100
@@ -877,6 +891,7 @@ function death(delay,duration)
 	clearlevel()
 	start=tick
 	state="dead"
+	if deathgifs then extcmd("video") end
 --	extcmd("video",4,1)
 	if extralives<0 then
 		gameoveranimation=cocreate(gameover)
@@ -1613,7 +1628,8 @@ function title_setup()
 			96,0,ps[2].playing and 12 or 1)
 		
 		color(1)
-		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
+		print("c"..smallcaps("asey"),108,117)
+--		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
 		print("l"..smallcaps("abrack"),100,122)
 
 		print(smallcaps("v").."."..version,1,122)
@@ -1621,8 +1637,10 @@ function title_setup()
 	end
 	dset(2,difficulty)
 	sfx(34,-2)
---	lvl=6
-	if difficulty==1 then lvl=0 else lvl=1 end
+
+	-- play tau 0 if noob or on practice difficulty
+	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
+	
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
