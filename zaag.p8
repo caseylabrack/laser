@@ -7,15 +7,20 @@ __lua__
 -- an asteroids-like with lasers and mulligans
 
 -- todo:
---  timer shown on win
+--  scrape particles for wall collisions
+--  consider bringing back shake
+--  "lost contact with equipment"
+--  maybe 2-player bounces
+--  maybe scrape animation based on laser particles
+--  maybe meater hit/kill noise
+--  maybe homing bomb sound (like ufo in asteroids)
 --  maybe show timer option
---  boss hp display
---  p2 join midgame?
---  different rocket trail
---  gun ready animation maybe
---  different color bullets?
+--  maybe p2 join midgame
+--  maybe different rocket trail
+--  maybe gun ready animation
+--  maybe different color bullets?
 
-version=43
+version=44
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -32,15 +37,15 @@ fs= {} --flowers
 rs= {} --roids
 bs= {} --bullets
 inner = {x=64,y=64,r=6,enabled=true}
-outer = {x=64,y=64,r=63,enabled=true}
+outer = {r=63}
 lvl=12
 mulligans=1
 extralives=mulligans
 mulldiff={2,1,0} --how many mulligans for each difficulty
 mulmsg={ --titlescreen mulligan description
-"(2 mulligans, 2x dmg)",
-"(1 mulligan, 1.5x dmg)",
-"(0 mulligans, 1x dmg)",
+"(2 extra wings, 2x pwr)",
+"(1 extra wing, 1.5x pwr)",
+"(0 extra wings, 1x pwr)",
 }
 diffmsg={--titlescreen difficulty description
 "difficulty: practice",
@@ -58,14 +63,16 @@ fire_btn=❎
 thrust_btn=🅾️
 --screenshake=true
 deathgifs=false
---coroutines:
-wipe=nil
-blink=nil
-title=nil
-dethmsg=nil
-dethparts=nil
-gamewon=nil
-log=""
+seconds,minutes=0,0
+--[[coroutines:
+  wipe
+  blink
+  title
+  dethmsg
+  dethparts
+  gamewon]]
+
+--log=""
 
 --cartdata slots
 --0: action button swap
@@ -89,11 +96,11 @@ tips={
 --	{"for safety in the tau,","ships fire only one","bullet at a time"},
 	{"very close range shots","= very fast rate of fire"},
 	{"quick flip (⬇️) is","faster than doing a 180"},
---	{"the tele takes a","while to charge.","good thing you're","good at dodging"},
 	{"pause screen has some","additional options"},
 	{"real winners","say no to drugs"},
 	{"gun needs to warm up,","tele is charged at start"},
 	{"if it's ugly,","shoot it"},
+	{"a zoid tail shows","zoid speed and direction"},
 }
 
 function _init()
@@ -183,6 +190,14 @@ end
 function _update()
 tick+=1
 
+if tick%30==0 then
+	seconds+=1
+	if seconds%60==0 then
+		seconds=0
+		minutes+=1
+	end
+end
+
 -- do animations
 for a in all(as) do
 	if costatus(a)!="dead" then assert(coresume(a))
@@ -201,9 +216,9 @@ end
 
 boss:update()
 
-for p in all(ps) do
-	p:update()
-end
+--for p in all(ps) do
+--	p:update()
+--end
 
 -- play rocket noise (only once) if either is rocketing
 local thrust=ps[1].thrusting or ps[2].thrusting
@@ -298,14 +313,13 @@ for l in all(lz) do
 			del(l.parts,z)
 		end
 	end
-		local z={}
-		z.x,z.y=l.x,l.y
-		z.a=l.a+.5+rndr(-.25,.25)
-		z.dx=cos(z.a)*rndr(1,2)
-		z.dy=sin(z.a)*rndr(1,2)
-		z.tick=tick
-		add(l.parts,z)
---	end
+	
+	local a=l.a+.5+rndr(-.25,.25)
+	add(l.parts,{
+		x=l.x,y=l.y,
+		dx=cos(a)*rndr(1,2),dy=sin(a)*rndr(1,2),
+		tick=tick
+	})
 end
 
 -- safe zones
@@ -336,6 +350,8 @@ end
 h:update()
 
 for p in all(ps) do
+
+	p:update()
 	
 	if not p.playing then break end
 
@@ -366,12 +382,8 @@ for p in all(ps) do
 		if boss.enabled and touching(p,boss.floor) then
 				died(p,boss)
 		end
-	end
-end
-
---laser/player collision
-for p in all(ps) do	
-	if p.enabled then
+		
+		--laser/player collision
 		local d=dist(p.x,p.y,64,64)
 		local vulnerable=true
 		for z in all(zs) do
@@ -399,7 +411,8 @@ for v in all(rs) do
 		v.x=x v.y=y
 		deflect(v,a)
 	end
-	if dist(v.x,v.y,64,64)<4+v.r and inner.enabled then
+	if dist(v.x,v.y,64,64)<4+v.r and lvl~=12 then
+--	if dist(v.x,v.y,64,64)<4+v.r and inner.enabled then
 		local a=atan2(v.x-64,v.y-64)
 		local x=64+cos(a)*(4+v.r)
 		local y=64+sin(a)*(4+v.r)
@@ -512,7 +525,7 @@ function died(player,cause)
 	if state~="running" then return end
 --	sfx(2,-2)
 	sfx(13)
-	shake+=4
+--	shake+=4
 	if player.enabled then
 		player.enabled=false
 		player.thrusting=false
@@ -527,13 +540,6 @@ function died(player,cause)
 		coresume(a,15,30)
 		add(as,a)
 	end
---	dethparts=cocreate(deathparticles)
---	coresume(dethparts,cause)
---	extralives-=1
---	state="death"
---	local a=cocreate(death)
---	coresume(a,15,30)
---	add(as,a)
 end
 
 function _draw()
@@ -551,12 +557,6 @@ cls()
 --end
 
 pal(cp)
-
---do animations
-for z in all(a2) do
-	if costatus(z)!="dead" then assert(coresume(z))
-	else del(a2,z) end
-end
 
 --tau zero instructions
 if lvl==0 and (state=="running" or state=="setup") then
@@ -600,16 +600,22 @@ sspr(64,64,64,64,0,64,64,64,true,false)
 palt()
 pal(cp)
 
+--do animations
+for z in all(a2) do
+	if costatus(z)!="dead" then assert(coresume(z))
+	else del(a2,z) end
+end
+
 --safezone bot
 for z in all(zs) do
 	spr(5,z.x-4,z.y-4)
 end
 
 pal()
-if outer.enabled then
-	circ(outer.x,outer.y,outer.r,6)
+--if outer.enabled then
+	circ(64,64,outer.r,6)
 --	circle(outer.x,outer.y,outer.r,6)
-end
+--end
 pal(cp)
 
 --laser
@@ -627,12 +633,12 @@ end
 --flowers
 for f in all(fs) do
 	for l in all(f) do
-			fillp(ˇ)
-			circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
-			fillp()
+		fillp(ˇ)
+		circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
+		fillp()
 	end
 	for l in all(f) do
-			spr(20,l.x-4,l.y-4)
+		spr(20,l.x-4,l.y-4)
 	end
 end
 
@@ -729,6 +735,17 @@ if state=="running" then
 	end
 end
 
+-- boss ui
+if boss.enabled then
+	local c=tick-boss.lasthit<10 and tick%4<2
+	line(0,126,32*(boss.hp/360),126, c and 7 or 14)
+	color(14)
+	for i=0,3 do
+		pset(32*i/3,127)
+	end
+	print("zoidhive",0,120)
+end
+
 if state=="running" or state=="setup" then
 	print("tau "..lvl,0,2,7)
 	for i=1,extralives do
@@ -746,13 +763,14 @@ end
 
 --print(stat(1),0,120,7)
 
-if state=="death" and outer.enabled then
-	circle(outer.x,outer.y,outer.r,6)
+--if state=="death" and outer.enabled then
+if state=="death" then
+	circle(64,64,outer.r,6)
 end
 
 if title and costatus(title)~="dead" then coresume(title) end
 
-print(log,0,120,7)
+--print(log,0,120,7)
 
 end
 
@@ -781,8 +799,9 @@ function wipe_anim()
 	local start=tick
 	while tick-start<30 do
 		if tick-start==15 then ps[1].enabled=false end
-		local pct=(tick-start)/30
-		pct=easeinexpo(pct)
+		local pct=easeinexpo((tick-start)/30)
+--		local pct=(tick-start)/30
+--		pct=easeinexpo(pct)
 		local r=inner.r+(63-inner.r)*pct
 		circfill(64,64,r,0)
 		circ(64,64,r,6)
@@ -793,14 +812,14 @@ function wipe_anim()
 	circ(64,64,63,6)
 	clearlevel()
 	boss.enabled=false
-	outer.enabled=true
+--	outer.enabled=true
 	outer.r=63
 	add(as,cocreate(spawn))
 end
 
 function spawn()
-	state="setup"
-	i,c=10,22
+	extcmd("rec")
+	state,i,c="setup",10,22
 	for p in all(ps) do
 		p:spawn()
 	end
@@ -818,7 +837,7 @@ function spawn()
 				local a=aim_away(.25,.25)
 				local d=rnd(64-24)+12
 				r.x=64+cos(a)*d r.y=64+sin(a)*d
-				local to_p=1--atan2(p.x-r.x,p.y-r.y)
+				local to_p=atan2(ps[1].x-r.x,ps[1].y-r.y)
 				local a2=aim_away(to_p,.25)
 				local spd=rnd(1.25)+.5
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
@@ -996,14 +1015,13 @@ function deathmsg_anim()
 	local msg=rnd(dethmsgs)
 	local ypos=62
 	while true do
---		cprint("craft destroyed.", 64, ypos-24,1)
+--		cprint("razorwing lost.", 64, ypos-24,7)
 		cprint("pilot notes:", 64, ypos-8,7)
-
---		cprint("craft destroyed. pilot notes:", 64, ypos-8,7)
 		cprint("\""..smallcaps(msg).."\"",64,ypos,6)
-		local mulls=extralives==1 and " mulligan" or " mulligans"
-		cprint(""..extralives..mulls,64,ypos+24,7)
-		cprint("left this tau",64,ypos+32,7)
+		local mulls=extralives==1 and " wing" or " wings"
+--		local mulls=extralives==1 and " mulligan" or " mulligans"
+		cprint(""..extralives.." extra"..mulls,64,ypos+24,13)
+		cprint("left this tau",64,ypos+32,13)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
 				if tick%20>10 then
@@ -1018,8 +1036,10 @@ function deathmsg_anim()
 end
 
 function gamewin_anim()
-	local i=90
-	
+--stop timer, convert to formatted string
+	local final_time=""..minutes..":"..(seconds<10 and "0"..seconds or seconds)
+
+	local i=90	
 	for v in all(rs) do --roids
 		local z=cocreate(rsplode)
 		coresume(z,v.x,v.y,v.r,v.dx,v.dy)
@@ -1059,23 +1079,25 @@ function gamewin_anim()
 	end
 	clearlevel()
 	inner.enabled=false
+	ps[1].enabled,ps[2].enabled=false,false
 	
-	local msg=rnd({"2 ez","gottem"})
-	i=90
-	cp=dp
+--	local msg=rnd({"2 ez","gottem","booyah."})
+	local msg=rnd(split"2 ez,gottem,booyah.")
+	i,cp=90,dp
 	sfx(39)
-	while i>0 or btn()==0 do --fade back in, then exit with anykey
+	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
 		local pct=i/90
 --		cp=bwp[ceil(pct*#bwp)]
 		i-=1
 
-		local ypos=62
+--		local ypos=62
 		
---		cprint("last tau cleared. pilot notes:", 64, ypos-8,7)
-		cprint("last tau cleared!", 64, ypos-32,7)
-		cprint("pilot notes:", 64, ypos-8,7)
+		cprint("last tau cleared!", 64,30,7)
+		cprint("pilot notes:",64,54,7)
+		cprint("\""..smallcaps(msg).."\"",64,62,6)
 
-		cprint("\""..smallcaps(msg).."\"",64,ypos,6)
+		cprint("time: "..final_time,64,84,13)
+		cprint(diffmsg[difficulty],64,90,13)
 
 		yield()
 	end	
@@ -1085,7 +1107,7 @@ function gamewin_anim()
 end
 
 function clearlevel()		
-		lz={}	zs={} h.enabled=false rs={} fs={}
+		lz,zs,h.enabled,rs,fs={},{},false,{},{}
 		for b in all(bs) do
 			b.enabled=false b.parts={}
 		end 
@@ -1332,8 +1354,8 @@ function initplayers()
 			update=function(_ENV)
 				if not enabled then return end
 				charge+=1 gun=min(gun+1,gunfull)
-				if btn(➡️,id) then a-=rt log=a end
-				if btn(⬅️,id) then a+=rt log=a end
+				if btn(➡️,id) then a-=rt end
+				if btn(⬅️,id) then a+=rt end
 				if btn(⬇️,id) then
 					if tick-fliplast>flipready then
 					 a+=.5
@@ -1644,14 +1666,15 @@ function title_setup()
 	end
 	dset(2,difficulty)
 	sfx(37,-2)
-
+	seconds,minutes=0,0
+	
 	-- play tau 0 if noob or on practice difficulty
 	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
 		
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
-	wipe=cocreate(wipe_anim)
+	wipe=cocreate(wipe_anim)	
 end
 -->8
 -- boss
@@ -1742,12 +1765,9 @@ render=function(_ENV)
 	end
 	local c=tick-lasthit<10 and 7 or 15
 	local hit=tick-lasthit<10
-	local bosscolor=14
-	local hitcolor=8
-	local flickerrate=4
 	if hit then 
-		if tick%flickerrate<flickerrate/2 then
-			pal(bosscolor,8)
+		if tick%4<2 then
+			pal(14,8)
 		end
 	end
 	
@@ -1758,8 +1778,8 @@ render=function(_ENV)
 	palt(10,true)
 	local wid=x2-x1
 	local scale=wid*(1-detht)
-	if detht>.33 then pal(bosscolor,2) end
-	if detht>.66 then pal(bosscolor,1) end
+	if detht>.33 then pal(14,2) end
+	if detht>.66 then pal(14,1) end
 	sspr(x1,y1,wid,wid,
 	x-scale/2,y-scale/2,
 	scale,scale)
@@ -1768,7 +1788,7 @@ render=function(_ENV)
 	-- if boss dying,center eye elements
 	local lidr,pupr=detht==0 and 2 or 0,detht==0 and 5 or 0
 
-	circ(x+cos(top)*lidr,y+sin(top)*lidr,(r-4)*(1-detht),bosscolor)
+	circ(x+cos(top)*lidr,y+sin(top)*lidr,(r-4)*(1-detht),14)
 	if detht<.33 and detht<1 then
 		spr(20,x-3+cos(top)*pupr,y-3+sin(top)*pupr)
 	else
@@ -2060,10 +2080,10 @@ __sfx__
 00020000316503165030650316503a70037700306502c6502d6502e650307003370033700276002c6502d6502c65030700276002d6502c650306503365000700007002a6502a650296500070024650226501f650
 001400000c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a12007120
 011400000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a65005600036000060005650006000060000600
-001400001145011450114501145011400114001345216452114001345016450164001145011450114501145000400274002740027400274000040000400004000040000400004000040000400004000040000400
+011400001140011400114001140011400114001340016400114001340016400164001140011400114001140000400274002740027400274000040000400004000040000400004000040000400004000040000400
 011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
 000800000f5501b550275503355000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
-00020d123551033510305102e5102e5102b5102951027510225101b5101651013510115100f5100f5100f5100f5100f5100050000500005000050000500005000050000500005000050000500005000050000500
+01020d123550033500305002e5002e5002b5002950027500225001b5001650013500115000f5000f5000f5000f5000f5000050000500005000050000500005000050000500005000050000500005000050000500
 000200003f5203c5203c5203a5203552035520335202e5202b5202b52029520275202452022520225201f5201d5201b520185201652013520115200f5200f5200c5200c5200a5200a52007520055200352003520
 000200000576022760297601d76007760077600070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 010600003a4513745135451334511d4510f4510740100401074010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401
