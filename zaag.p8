@@ -7,20 +7,10 @@ __lua__
 -- an asteroids-like with lasers and mulligans
 
 -- todo:
---  scrape particles for wall collisions
---  consider bringing back shake
---  "lost contact with equipment"
---  maybe 2-player bounces
---  maybe scrape animation based on laser particles
---  maybe meater hit/kill noise
---  maybe homing bomb sound (like ufo in asteroids)
---  maybe show timer option
---  maybe p2 join midgame
---  maybe different rocket trail
---  maybe gun ready animation
---  maybe different color bullets?
+--  maybe just try lil camera follow
+--  better hero image on itch
 
-version=44
+version=45
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -28,42 +18,34 @@ dmg={
 	{roid=1,flower=1,bomb=30,boss=2},--hard
 }
 laserspeeds={.005,.004,.003}
-ps= {} --players
-lz= {} --lasers
-zs= {} --safe zones
-as= {} --animations (coroutines)
-a2= {} --animations in draw phase
-fs= {} --flowers
-rs= {} --roids
-bs= {} --bullets
-inner = {x=64,y=64,r=6,enabled=true}
-outer = {r=63}
-lvl=12
-mulligans=1
+--players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets
+ps,lz,zs,as,a2,fs,rs,bs={},{},{},{},{},{},{},{}
+inner,outer_r={x=64,y=64,r=6,enabled=true},63
+lvl,mulligans=1,1
 extralives=mulligans
 mulldiff={2,1,0} --how many mulligans for each difficulty
 mulmsg={ --titlescreen mulligan description
-"(2 extra wings, 2x pwr)",
-"(1 extra wing, 1.5x pwr)",
-"(0 extra wings, 1x pwr)",
+"(2 spares, 2x pwr)",
+"(1 spare, 1.5x pwr)",
+"(0 spares, 1x pwr)",
 }
 diffmsg={--titlescreen difficulty description
 "difficulty: practice",
 "difficulty: challenge",
 "difficulty: prestige",
 }
-difficulty=1--1 easy,2 med,3 hard
-tick=0
-state="title"
+tick,state=0,"title"
 cp=dp--current pallete
-sleep=0
-shake=0
+sleep,shake=0,0
 pthrusting=false --was anybody making the thrust noise last frame?
-fire_btn=❎
-thrust_btn=🅾️
---screenshake=true
-deathgifs=false
 seconds,minutes=0,0
+
+--properties shared by p1 and p2
+charge,fullcharge,hopfail,hopfailtick=230,230,false,0
+gun=0 gunfull=120 gunfail=false gunfailtick=0
+
+--difficulty:1 easy,2 med,3 hard
+
 --[[coroutines:
   wipe
   blink
@@ -79,6 +61,7 @@ seconds,minutes=0,0
 --1: death gifs
 --2: last difficulty
 --3: is noob
+--4: screenshake toggle (0 is on, 1 is off)
 
 dethmsgs=split(
 [[zigged when i shoulda zaaged
@@ -92,15 +75,14 @@ no one is perfect]],"\n")
 tips={
 	{"remember to take","15 minute breaks!"},
 	{"zaag is a fun game"},
---	{"ship defenses have","an initial charge time.","i know, i'm sorry."},
---	{"for safety in the tau,","ships fire only one","bullet at a time"},
 	{"very close range shots","= very fast rate of fire"},
 	{"quick flip (⬇️) is","faster than doing a 180"},
 	{"pause screen has some","additional options"},
 	{"real winners","say no to drugs"},
-	{"gun needs to warm up,","tele is charged at start"},
-	{"if it's ugly,","shoot it"},
+	{"blaster has warm up,","tele is charged at start"},
+	{"if it's weird-looking,","shoot it"},
 	{"a zoid tail shows","zoid speed and direction"},
+	{"in two-pilot missions,","please try to limit","friendly fire incidents"},
 }
 
 function _init()
@@ -111,6 +93,7 @@ function _init()
 --	screenshake=dget(1)==1
 	deathgifs=dget(1)==1
 	difficulty=dget(2)
+	screenshake=dget(4)==0
 	difficulty=difficulty==0 and 1 or difficulty
 	initplayers()
 
@@ -119,18 +102,17 @@ function _init()
 		add(bs,
 		setmetatable({
 			x=0,y=0,a=0,dx=0,dy=0,enabled=false,
-			r=2,speed=5,parts={},
+			r=2,speed=5,parts={},id=i-1,
 			splash=function(_ENV)
 				for i=1,10 do
 					local ps={}
 					ps.x,ps.y=x,y
-					local d=rnd(4)
-					local ang=rndr(-.2,.2)
-					ps.dx=cos(a+.5+ang)*d
-					ps.dy=sin(a+.5+ang)*d
-					ps.t=rnd(6)
+					local d,ang=rnd(4),rndr(-.2,.2)
+					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(6)
 					add(parts,ps)
 				end
+				enabled=false 
+				sfx(20,-2)
 			end,
 			
 			doparticles=function(_ENV)
@@ -160,7 +142,7 @@ function _init()
 	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 	menuitem(2, "save screenshot", function () extcmd("screen") end)
 	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
---	menuitem(2, "screenshake:"..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
 end
 
 function btns_toggle()
@@ -180,12 +162,12 @@ function dethgiftoggle()
 	return true
 end
 
---function screenshake_toggle()
---	screenshake=not screenshake
---	menuitem(2, screenshake==true and "screenshake:on" or "screenshake:off",screenshake_toggle)
---	dset(1,screenshake==true and 1 or 0)
---	return true
---end
+function screenshake_toggle()
+	screenshake=not screenshake
+	menuitem(4, screenshake==true and "screenshake: on" or "screenshake: off",screenshake_toggle)
+	dset(4,screenshake==true and 0 or 1)
+	return true
+end
 
 function _update()
 tick+=1
@@ -209,16 +191,14 @@ if state=="setup" or state=="wipe" or state=="win" then
 end
 
 --pauses most game logic for a number of frames
---if sleep>0 then
---	sleep-=1
---	return
---end
+if sleep>0 then
+	sleep-=1
+	return
+end
 
+charge+=1
+gun=min(gun+1,gunfull)
 boss:update()
-
---for p in all(ps) do
---	p:update()
---end
 
 -- play rocket noise (only once) if either is rocketing
 local thrust=ps[1].thrusting or ps[2].thrusting
@@ -292,9 +272,9 @@ for l in all(lz) do
 		
 		-- hit safezone instead
 		if abs(diff)<30 then 
-			local flag=10
-			circ(s.x,s.y,s.r,flag)
-			circfill(s.x,s.y,s.r,flag)			
+--			local flag=10
+			circ(s.x,s.y,s.r,10)
+			circfill(s.x,s.y,s.r,10)			
 
 			local inzone=true
 			local dx,dy=cos(l.a),sin(l.a)
@@ -399,7 +379,7 @@ for p in all(ps) do
 	end
 end
 
---bouncing around
+--zoids bouncing around
 for v in all(rs) do
 	if not v.enabled then goto continue end
 	v.x=v.x+v.dx
@@ -436,17 +416,20 @@ for b in all(bs) do
 			for f in all(fs) do --flowers
 				for l in all(f) do --leaves
 					if touching(b,l) then
-						b.enabled=false sfx(20,-2)
 						b:splash()
 	--					sfx(24)
-						sfx(21)
+--						sfx(21)
 						l.r-=dmg[difficulty].flower
 						l.growcount=0
 						l.hit=tick
 						if l.r<3 then
-							shake+=2
+							shake+=5
+							sleep+=2
 							del(f,l)
+							sfx(43)
 							if #f==0 then del(fs,f) end
+						else
+							sfx(42)
 						end
 						goto donebullet
 					end
@@ -454,24 +437,36 @@ for b in all(bs) do
 			end
 			for v in all(rs) do --roids
 				if touching(b,v) then
-					b.enabled=false sfx(20,-2)
 					b:splash()
-					sfx(21)
+--					sfx(21)					
 					local oldr=v.r
 					v.r-=dmg[difficulty].roid
 					v.hit=tick
+--					shake+=5
 					if v.r<3 then	
-						shake+=1.1
+						shake+=5
 						local z=cocreate(rsplode)
 						coresume(z,v.x,v.y,oldr,v.dx,v.dy)
 						add(a2,z)
 						del(rs,v) 
+						sfx(43)
+						sleep+=2
+					else
+						sfx(42)
 					end
 					goto donebullet
 				end
 			end
+			for p in all(ps) do
+				if b.id~=p.id and p.enabled and touching(b,p) then
+					p.dx+=b.dx/4
+					p.dy+=b.dy/4
+					b:splash()
+					goto donebullet
+				end
+			end
 			if h.enabled and touching(h,b) then
-				b.enabled=false sfx(20,-2)
+				sfx(42)
 				b:splash()
 				h.stunned=true
 				h.timer=dmg[difficulty].bomb
@@ -481,12 +476,11 @@ for b in all(bs) do
 			if boss.enabled and touching(boss,b) then
 				boss.hp-=dmg[difficulty].boss
 				boss.lasthit=tick
-				b.enabled=false
 				b:splash()
+				sfx(42)
 				goto donebullet
 			end			
 			if touching(inner,b) or distt(inner,b)>63 then
-				b.enabled=false sfx(20,-2)
 				b:splash()
 				goto donebullet
 			end
@@ -502,6 +496,7 @@ if ps[1].enabled or ps[2].enabled then
 		extralives=mulligans
 		ps[1].thrusting,ps[2].thrusting=false,false
 		pthrusting=false
+		sleep=0
 		sfx(2,-2)
 		if lvl==2 then dset(3,1) end
 		lvl+=1
@@ -521,11 +516,12 @@ end
 
 end
 
+
 function died(player,cause)
 	if state~="running" then return end
 --	sfx(2,-2)
 	sfx(13)
---	shake+=4
+	shake+=20
 	if player.enabled then
 		player.enabled=false
 		player.thrusting=false
@@ -545,22 +541,24 @@ end
 function _draw()
 cls()
 
---if shake > 1 then
---	if screenshake then
---		camera()
---		local a=rnd()
---		camera(cos(a)*shake,sin(a)*shake)
---	end
---	shake*=.75
---else
---	camera()
---end
+camera()
+if sleep<=0 then --hitstop, then shake
+	if shake>0 then
+		if screenshake then
+			local a=rnd()
+			local mag=(shake/8)^2
+			camera(cos(a)*mag,sin(a)*mag)
+		end
+		shake-=1
+	end
+end
 
 pal(cp)
 
 --tau zero instructions
 if lvl==0 and (state=="running" or state=="setup") then
-	cprint("cleanse the tau",64,24,1)
+	cprint("cleanse the tau.",64,24,1)
+	cprint("expel the zoids.",64,36,1)
 	local x,y,lh=40,78,8
 	color((btn(⬅️) or btn(➡️)) and 12 or 1)
 	print("⬅️➡️: steer",x,y)
@@ -613,7 +611,7 @@ end
 
 pal()
 --if outer.enabled then
-	circ(64,64,outer.r,6)
+	circ(64,64,outer_r,6)
 --	circle(outer.x,outer.y,outer.r,6)
 --end
 pal(cp)
@@ -693,46 +691,34 @@ pal()
 
 if state=="running" then
 	--gun countdown
-	local p=ps[2].playing and ps[2].enabled and ps[2] or ps[1]
+--	local p=ps[2].playing and ps[2].enabled and ps[2] or ps[1]
 	local x,y,x2,y2=97,0,127,8
-	local pct=min(p.gun/p.gunfull,1)
-	local f=p.gun<p.gunfull and 1 or 12
-	if p.gunfail then
+	local pct=min(gun/gunfull,1)
+--	local pct=min(p.gun/p.gunfull,1)
+	local f=gun<gunfull and 1 or 12
+	log=gunfail
+	if gunfail then
  	f=8
-		p.gunfail=false
+		gunfail=false
 	end
 	clip(x,y,(x2-x)*pct+1,y2+1)
 	rect(x,y,x2,y2,f)
-	print("gun rdy",x+2,y+2,f)
+	clip()
+	print("blaster",x+2,y+2,f)
 	
  --hop countdown
-	if not ps[2].playing then
-		local f=p.charge<p.fullcharge and 3 or 11
-		if p.hopfail then
-			f=8
-			p.hopfail=false
-		end
-	 local pct=min(p.charge/p.fullcharge,1)
-		local x,x2,y,y2=109,127,10,18
-		clip(x,y,(x2-x)*pct+1,10)
-		rect(x,y,x2,y2,f)
-		clip()
-		print("tele",x+2,y+2,f)
-	else
-		for p in all(ps) do
-			local f=p.charge<p.fullcharge and 3 or 11
-			if p.hopfail then
-				f=8
-				p.hopfail=false
-			end
-		 local pct=min(p.charge/p.fullcharge,1)
-			local x,x2,y,y2=109,127,p.id==0 and 10 or 14,p.id==0 and 14 or 18
-			clip(x,y,(x2-x)*pct+1,10)
-			rect(x,y,x2,y2,f)
-			clip()
-		end
-		print("tele",111,12,11)
+	local f=charge<fullcharge and 3 or 11
+	if hopfail then
+		f=8
+		hopfail=false
 	end
+ local pct=min(charge/fullcharge,1)
+--	local x,x2,y,y2=107,127,10,18
+	local x,x2,y,y2=109,127,10,18
+	clip(x,y,(x2-x)*pct+1,10)
+	rect(x,y,x2,y2,f)
+	clip()
+	print("tele",x+2,y+2,f)
 end
 
 -- boss ui
@@ -765,7 +751,7 @@ end
 
 --if state=="death" and outer.enabled then
 if state=="death" then
-	circle(64,64,outer.r,6)
+	circle(64,64,outer_r,6)
 end
 
 if title and costatus(title)~="dead" then coresume(title) end
@@ -777,6 +763,7 @@ end
 -->8
 --levels
 lvls={
+--	[0]={flowers=1},
 	[0]={roids=1,lasers=1},
 	{roids=4,lasers=1},--1
 	{roids=6,lasers=1,safezone=true},--2
@@ -805,15 +792,13 @@ function wipe_anim()
 		local r=inner.r+(63-inner.r)*pct
 		circfill(64,64,r,0)
 		circ(64,64,r,6)
-		outer.r=63+pct*50
+		outer_r=63+pct*50
 		yield()
 	end
 	circfill(64,64,63,0)
 	circ(64,64,63,6)
 	clearlevel()
-	boss.enabled=false
---	outer.enabled=true
-	outer.r=63
+	outer_r=63
 	add(as,cocreate(spawn))
 end
 
@@ -823,6 +808,10 @@ function spawn()
 	for p in all(ps) do
 		p:spawn()
 	end
+	charge=fullcharge
+	gun=0
+	gunfailtick=0
+	sleep,shake=0,0
 
 	while c>0 do c-=1 yield() end
 	inner.enabled=true
@@ -1018,9 +1007,9 @@ function deathmsg_anim()
 --		cprint("razorwing lost.", 64, ypos-24,7)
 		cprint("pilot notes:", 64, ypos-8,7)
 		cprint("\""..smallcaps(msg).."\"",64,ypos,6)
-		local mulls=extralives==1 and " wing" or " wings"
+		local mulls=extralives==1 and " spare" or " spares"
 --		local mulls=extralives==1 and " mulligan" or " mulligans"
-		cprint(""..extralives.." extra"..mulls,64,ypos+24,13)
+		cprint(""..extralives..mulls,64,ypos+24,13)
 		cprint("left this tau",64,ypos+32,13)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
@@ -1082,7 +1071,7 @@ function gamewin_anim()
 	ps[1].enabled,ps[2].enabled=false,false
 	
 --	local msg=rnd({"2 ez","gottem","booyah."})
-	local msg=rnd(split"2 ez,gottem,booyah.")
+	local msg=split"gottem,booyah,2 ez."
 	i,cp=90,dp
 	sfx(39)
 	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
@@ -1092,9 +1081,9 @@ function gamewin_anim()
 
 --		local ypos=62
 		
-		cprint("last tau cleared!", 64,30,7)
+		cprint("every tau immaculate!", 64,30,7)
 		cprint("pilot notes:",64,54,7)
-		cprint("\""..smallcaps(msg).."\"",64,62,6)
+		cprint("\""..smallcaps(msg[difficulty]).."\"",64,62,6)
 
 		cprint("time: "..final_time,64,84,13)
 		cprint(diffmsg[difficulty],64,90,13)
@@ -1343,17 +1332,17 @@ function initplayers()
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,
-			a=.75,t=.25,rt=.05,r=3,friction=.92,
-			hop=25,charge=230,fullcharge=230,hopfail=false,hopfailtick=0,
+			a=.75,t=.25,rt=.05,r=2,friction=.92,
+			hop=25,
 			enabled=false,thrusting=false,
-			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
+--			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
 			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
 			spawnticks=0,
 			
 			update=function(_ENV)
 				if not enabled then return end
-				charge+=1 gun=min(gun+1,gunfull)
+--				gun=min(gun+1,gunfull)
 				if btn(➡️,id) then a-=rt end
 				if btn(⬅️,id) then a+=rt end
 				if btn(⬇️,id) then
@@ -1363,21 +1352,21 @@ function initplayers()
 				 end
 				end
 				if btn(⬆️,id) then
-				 if charge>fullcharge then
+				 if _g.charge>_g.fullcharge then
 						local lines=coords(_ENV)
 						x+=cos(a)*hop
 						y+=sin(a)*hop
 						thrusting=false
 						_g.blink=cocreate(blink_anim)
-						coresume(blink,lines)
-						charge=0
+						coresume(_g.blink,lines)
+						_g.charge=0
 --						if ps[2].playing==false then _g.sleep=8 end
 						sfx(22)
 					else
-						if tick-hopfailtick>2 then
-							hopfail=true
+						if tick-_g.hopfailtick>2 then
+							_g.hopfail=true
 							sfx(12)
-							hopfailtick=tick
+							_g.hopfailtick=tick
 						end
 					end
 				end
@@ -1398,13 +1387,15 @@ function initplayers()
 						b.enabled=true
 						b.x,b.y,b.a=x,y,a
 						b.dx,b.dy=cos(b.a)*b.speed,sin(b.a)*b.speed
-						sfx(20)
-			--		sfx(25)
+						sfx(44)
+--						_g.shake+=2
+--						sfx(25)
 					else
 						if tick-gunfailtick>2 then
-							gunfail=true
+							_g.gunfail=true
 							sfx(12)
-							gunfailtick=tick
+							_g.gunfailtick=tick
+--							stop()
 						end
 					end
 				end
@@ -1447,6 +1438,7 @@ function initplayers()
 					line(x,y,x,y-30*t)
 					circfill(x,y,t*4)
 				end
+--				circ(x,y,r,10)
 			end,
 			
 			coords=function(_ENV)
@@ -1470,7 +1462,8 @@ function initplayers()
 			
 			spawn=function(_ENV)
 				if not playing then return end
-				a,dx,dy,charge,gun=-.1,0,0,fullcharge,0
+--				a,dx,dy,gun=-.1,0,0,0
+				a,dx,dy=-.1,0,0
 				y=id==0 and 32 or 16
 				x=id==0 and 64 or 72
 				spawnticks=16
@@ -1601,28 +1594,15 @@ function title_setup()
 		pal(7,0)
 		sspr(sc.x,sc.y,sc.w,sc.h,tc.x,tc.y)
 
---convert scany into oscillator so lines goes up and down
---		local os=sin(scany/100)*sc.h
-
 --scan line down the logotype
 		pal()
---		for i=1,4 do
---			local os=sin((scany+i)/100)*sc.h
---			for x=1,sc.w do
---				if sget(sc.x+x,sc.y+os)==7 then				
---					pset(tc.x+x,tc.y+os,os>.5 and col2[i] or col1[i])
---				end
---			end
---		end		
---		scany+=1
---		if scany>100 then scany=0 end
 
 		--difficulty choose
 		if haspressed then
-			if btnp(⬅️) or btn(⬇️) then
+			if btnp(⬅️) or btnp(⬇️) then
 				difficulty=mid(1,difficulty-1,3)
 			end			
-			if btnp(➡️) or btn(⬆️) then
+			if btnp(➡️) or btnp(⬆️) then
 				difficulty=mid(1,difficulty+1,3)
 			end
 			
@@ -1670,7 +1650,7 @@ function title_setup()
 	
 	-- play tau 0 if noob or on practice difficulty
 	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
-		
+
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
@@ -1684,7 +1664,7 @@ enabled=false,
 r=3,steadyx=64,steadyy=64,lasthit=-100,
 spawnnum=3,finalsize=10,
 growdur=80,detht=0,
-floor={x=64,y=64,r=18},
+floor={x=64,y=64,r=22},
 	
 update=function(_ENV)
 	if not enabled then return end
@@ -2084,7 +2064,7 @@ __sfx__
 011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
 000800000f5501b550275503355000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
 01020d123550033500305002e5002e5002b5002950027500225001b5001650013500115000f5000f5000f5000f5000f5000050000500005000050000500005000050000500005000050000500005000050000500
-000200003f5203c5203c5203a5203552035520335202e5202b5202b52029520275202452022520225201f5201d5201b520185201652013520115200f5200f5200c5200c5200a5200a52007520055200352003520
+010200003f5103c5103c5103a5103551035510335102e5102b5102b51029510275102451022510225101f5101d5101b510185101651013510115100f5100f5100c5100c5100a5100a51007510055100351003510
 000200000576022760297601d76007760077600070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 010600003a4513745135451334511d4510f4510740100401074010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401
 0108000005050070400a030130201f010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2106,10 +2086,10 @@ __sfx__
 01100000180201e0201f0201f0201f020270003c00037000350003500033000300002e0002b00029000290002700027000240002400022000220001f0001d0001d0001b0001b0001b0001b000000000000000000
 010a000030624306242e6242e6242e6242b6242b6242962429624246242262422624226241b6241b6241b6241b6241b6241b6241662413624136241362413624136240c6240c6240c6240c6240a6240a62405624
 010800000f05009050090500905000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01020000027700d770137700770002700017000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
+01020000027500d7501375007700027700c7701c77026770137700f7700c7700a7700877006770057700477003770027700177000770007000070000700007000070000700007000070000700007000070000700
+000200002c01025010200101c01019010170101401012010100100e0100b010090100701006010050100401004010030100301003010030100301002010010100101000010000100001000010000100001000010
+000200001a7101a7201a7301a7301a7001a7101a7301a7701a7601a7501a7401a7301a7201a710007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010c0000030540305003050030500f0050c0000f0050c000030540305003050030500f0000f0000f0000c000010540105001050010500f0000f0000f0000c000010540105001050010500f0000f0000f0000c000
