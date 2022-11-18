@@ -4,13 +4,9 @@ __lua__
 -- zaag
 -- casey labrack
 
--- an asteroids-like with lasers and mulligans
+-- zaag is pretending to be a lost 1980s vector arcade game. blast the zoids, cleanse the tau.
 
--- todo:
---  maybe just try lil camera follow
---  better hero image on itch
-
-version=45
+version=46
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -557,8 +553,8 @@ pal(cp)
 
 --tau zero instructions
 if lvl==0 and (state=="running" or state=="setup") then
-	cprint("cleanse the tau.",64,24,1)
-	cprint("expel the zoids.",64,36,1)
+	cprint("blast the zoids.",64,24,1)
+	cprint("cleanse the tau.",64,36,1)
 	local x,y,lh=40,78,8
 	color((btn(⬅️) or btn(➡️)) and 12 or 1)
 	print("⬅️➡️: steer",x,y)
@@ -803,7 +799,6 @@ function wipe_anim()
 end
 
 function spawn()
-	extcmd("rec")
 	state,i,c="setup",10,22
 	for p in all(ps) do
 		p:spawn()
@@ -882,6 +877,7 @@ function spawn()
 	c=i
 	while c>0 do c-=1 yield() end
 	state="running"
+	extcmd("rec")
 end
 
 function death(delay,duration)
