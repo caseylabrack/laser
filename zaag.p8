@@ -1,12 +1,12 @@
 pico-8 cartridge // http://www.pico-8.com
-version 38
+version 41
 __lua__
 -- zaag
 -- casey labrack
 
 -- zaag is pretending to be a lost 1980s vector arcade game. blast the zoids, cleanse the tau.
 
-version=46
+version=47
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -1540,6 +1540,7 @@ end
 -->8
 --title screen
 function title_setup()
+	tick=0
 	sfx(37)
 	clearlevel()
 	inner.enabled=true
