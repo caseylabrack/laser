@@ -6,7 +6,11 @@ __lua__
 
 -- zaag is pretending to be a lost 1980s vector arcade game. blast the zoids, cleanse the tau.
 
-version=47
+-- arrow keys
+-- 60fps
+-- flip sound
+
+version=48
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -66,7 +70,9 @@ mistakes were made
 testing ejector seat
 tax write-off
 had an oopsie-doopsie
-no one is perfect]],"\n")
+no one is perfect
+lag!
+]],"\n")
 
 tips={
 	{"remember to take","15 minute breaks!"},
@@ -79,14 +85,14 @@ tips={
 	{"if it's weird-looking,","shoot it"},
 	{"a zoid tail shows","zoid speed and direction"},
 	{"in two-pilot missions,","please try to limit","friendly fire incidents"},
+	{"don't panic"},
 }
 
 function _init()
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
 	fire_btn  = (not swapped) and ❎ or 🅾️ 
-	thrust_btn= (not swapped) and 🅾️ or ❎
---	screenshake=dget(1)==1
+	tele_btn = (not swapped) and 🅾️ or ❎
 	deathgifs=dget(1)==1
 	difficulty=dget(2)
 	screenshake=dget(4)==0
@@ -143,10 +149,10 @@ end
 
 function btns_toggle()
 	if fire_btn==❎ then	
-		fire_btn=🅾️ thrust_btn=❎
+		fire_btn=🅾️ tele_btn=❎
 		dset(0,1)
 	else	
-		fire_btn=❎ thrust_btn=🅾️
+		fire_btn=❎ tele_btn=🅾️
 		dset(0,0)
 	end 
 end
@@ -166,6 +172,7 @@ function screenshake_toggle()
 end
 
 function _update()
+--function _update60()
 tick+=1
 
 if tick%30==0 then
@@ -556,20 +563,12 @@ if lvl==0 and (state=="running" or state=="setup") then
 	cprint("blast the zoids.",64,24,1)
 	cprint("cleanse the tau.",64,36,1)
 	local x,y,lh=40,78,8
-	color((btn(⬅️) or btn(➡️)) and 12 or 1)
-	print("⬅️➡️: steer",x,y)
-	y+=lh
-	color(btn(⬆️) and 12 or 1)
-	print("⬆️: tele",x,y)
-	y+=lh
-	color(btn(⬇️) and 12 or 1)
-	print("⬇️: flip",x,y)
 	y+=lh
 	color(btn(❎) and 12 or 1)
-	print("❎ (x): "..(fire_btn==❎ and "shoot" or "thrust"),x,y)
+	print("❎ (x): "..(fire_btn==❎ and "shoot" or "tele"),x,y)
 	y+=lh
 	color(btn(🅾️) and 12 or 1)
-	print("🅾️ (z): "..(thrust_btn==🅾️ and "thrust" or "shoot"),x,y)
+	print("🅾️ (z): "..(tele_btn==🅾️ and "tele" or "shoot"),x,y)
 end
 
 --safe zone
@@ -1348,6 +1347,18 @@ function initplayers()
 				 end
 				end
 				if btn(⬆️,id) then
+					dx+=cos(a)*t
+					dy+=sin(a)*t
+					if not thrusting then
+						thrusting=true
+--						sfx(2)
+					end
+				else
+--					sfx(2,-2)
+					thrusting=false
+				end
+				if btn(tele_btn,id) then
+--				if btn(⬆️,id) then
 				 if _g.charge>_g.fullcharge then
 						local lines=coords(_ENV)
 						x+=cos(a)*hop
@@ -1365,17 +1376,6 @@ function initplayers()
 							_g.hopfailtick=tick
 						end
 					end
-				end
-				if btn(thrust_btn,id) then
-					dx+=cos(a)*t
-					dy+=sin(a)*t
-					if not thrusting then
-						thrusting=true
---						sfx(2)
-					end
-				else
---					sfx(2,-2)
-					thrusting=false
 				end
 				if btn(fire_btn,id) and not bs[id+1].enabled then
 					if gun==gunfull then
