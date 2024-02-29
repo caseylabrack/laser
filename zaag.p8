@@ -5,10 +5,8 @@ __lua__
 -- casey labrack
 
 --todo:
--- try replacing console
--- flip bug
+-- try accelerating turn
 -- 60fps
--- flip sound
 
 --😐:
 -- unique death animations
@@ -1331,11 +1329,11 @@ function initplayers()
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,
-			a=.75,t=.25,rt=.05,r=2,friction=.92,
+			a=.75,t=.2,rt=.02,r=2,friction=.92,
 			hop=25,
 			enabled=false,thrusting=false,
 --			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
-			flipready=10,fliplast=0,
+--			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
 			spawnticks=0,
 			
@@ -1344,12 +1342,12 @@ function initplayers()
 --				gun=min(gun+1,gunfull)
 				if btn(➡️,id) then a-=rt end
 				if btn(⬅️,id) then a+=rt end
-				if btn(⬇️,id) then
-					if tick-fliplast>flipready then
-					 a+=.5
-					 fliplast=tick
-				 end
-				end
+--				if btn(⬇️,id) then
+--					if tick-fliplast>flipready then
+--					 a+=.5
+--					 fliplast=tick
+--				 end
+--				end
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
