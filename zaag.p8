@@ -4,11 +4,15 @@ __lua__
 -- zaag
 -- casey labrack
 
--- zaag is pretending to be a lost 1980s vector arcade game. blast the zoids, cleanse the tau.
-
--- arrow keys
+--todo:
+-- try replacing console
+-- flip bug
 -- 60fps
 -- flip sound
+
+--😐:
+-- unique death animations
+-- music? 
 
 version=48
 _g=_ENV
