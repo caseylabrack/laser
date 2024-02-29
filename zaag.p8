@@ -7,9 +7,11 @@ __lua__
 --todo:
 -- try accelerating turn
 -- 60fps
+-- new inverse fill
 
 --😐:
 -- unique death animations
+-- custom font? for tau
 -- music? 
 
 version=48
@@ -74,7 +76,7 @@ tax write-off
 had an oopsie-doopsie
 no one is perfect
 lag!
-]],"\n")
+😐]],"\n")
 
 tips={
 	{"remember to take","15 minute breaks!"},
@@ -1328,8 +1330,8 @@ function initplayers()
 			setmetatable({
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
-			x=80,y=30,dx=0,dy=0,
-			a=.75,t=.2,rt=.02,r=2,friction=.92,
+			x=80,y=30,dx=0,dy=0,dr=0,
+			a=.75,t=.2,rt=.0075,r=2,
 			hop=25,
 			enabled=false,thrusting=false,
 --			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
@@ -1340,8 +1342,14 @@ function initplayers()
 			update=function(_ENV)
 				if not enabled then return end
 --				gun=min(gun+1,gunfull)
-				if btn(➡️,id) then a-=rt end
-				if btn(⬅️,id) then a+=rt end
+				if btn(➡️,id) then 
+--					a-=rt
+					dr-=rt 
+				end
+				if btn(⬅️,id) then 
+--					a+=rt 
+					dr+=rt
+				end
 --				if btn(⬇️,id) then
 --					if tick-fliplast>flipready then
 --					 a+=.5
@@ -1393,14 +1401,15 @@ function initplayers()
 							_g.gunfail=true
 							sfx(12)
 							_g.gunfailtick=tick
---							stop()
 						end
 					end
 				end
 				x+=dx
 				y+=dy
-				dx*=friction
-				dy*=friction
+				a+=dr
+				dx*=.92 --apply friction
+				dy*=.92
+				dr*=.65
 			end,
 			
 			render=function(_ENV)
