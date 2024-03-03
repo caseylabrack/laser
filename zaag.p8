@@ -1,16 +1,19 @@
 pico-8 cartridge // http://www.pico-8.com
-version 41
+version 42
 __lua__
 -- zaag
 -- casey labrack
 
--- zaag is pretending to be a lost 1980s vector arcade game. blast the zoids, cleanse the tau.
-
--- arrow keys
+--todo:
 -- 60fps
--- flip sound
 
-version=48
+--😐:
+-- unique death animations
+-- custom font? for tau
+-- music?
+-- toggle enable flip? 'enable ship flip'
+
+version=53
 _g=_ENV
 dmg={ 
 	{roid=2,flower=2,bomb=60,boss=4},--easy
@@ -73,13 +76,13 @@ tax write-off
 had an oopsie-doopsie
 no one is perfect
 lag!
-]],"\n")
+😐]],"\n")
 
 tips={
 	{"remember to take","15 minute breaks!"},
 	{"zaag is a fun game"},
 	{"very close range shots","= very fast rate of fire"},
-	{"quick flip (⬇️) is","faster than doing a 180"},
+--	{"quick flip (⬇️) is","faster than doing a 180"},
 	{"pause screen has some","additional options"},
 	{"real winners","say no to drugs"},
 	{"blaster has warm up,","tele is charged at start"},
@@ -90,6 +93,7 @@ tips={
 }
 
 function _init()
+	poke(0x5f34,0x2)--inverse fill
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
 	fire_btn  = (not swapped) and ❎ or 🅾️ 
@@ -172,7 +176,6 @@ function screenshake_toggle()
 	return true
 end
 
---function _update()
 function _update60()
 tick+=1
 
@@ -584,15 +587,7 @@ for z in all(zs) do
 end
 
 --clip game artwork (safezones) to circle
---(by painting outside of circle black)
-palt(2,true)
-pal(9,0)
-sspr(64,64,64,64,64,64)
-sspr(64,64,64,64,64,0,64,64,false,true)
-sspr(64,64,64,64,0,0,64,64,true,true)
-sspr(64,64,64,64,0,64,64,64,true,false)
-palt()
-pal(cp)
+circfill(64,64,outer_r,0 | 0x1800)
 
 --do animations
 for z in all(a2) do
@@ -1327,26 +1322,32 @@ function initplayers()
 			setmetatable({
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
-			x=80,y=30,dx=0,dy=0,
-			a=.75,t=.25,rt=.05,r=2,friction=.92,
+			x=80,y=30,dx=0,dy=0,dr=0,
+			a=.75,t=.2,rt=.0075,r=2,
 			hop=25,
 			enabled=false,thrusting=false,
 --			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
-			flipready=10,fliplast=0,
+--			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
 			spawnticks=0,
 			
 			update=function(_ENV)
 				if not enabled then return end
 --				gun=min(gun+1,gunfull)
-				if btn(➡️,id) then a-=rt end
-				if btn(⬅️,id) then a+=rt end
-				if btn(⬇️,id) then
-					if tick-fliplast>flipready then
-					 a+=.5
-					 fliplast=tick
-				 end
+				if btn(➡️,id) then 
+--					a-=rt
+					dr-=rt 
 				end
+				if btn(⬅️,id) then 
+--					a+=rt 
+					dr+=rt
+				end
+--				if btn(⬇️,id) then
+--					if tick-fliplast>flipready then
+--					 a+=.5
+--					 fliplast=tick
+--				 end
+--				end
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
@@ -1392,14 +1393,15 @@ function initplayers()
 							_g.gunfail=true
 							sfx(12)
 							_g.gunfailtick=tick
---							stop()
 						end
 					end
 				end
 				x+=dx
 				y+=dy
-				dx*=friction
-				dy*=friction
+				a+=dr
+				dx*=.92 --apply friction
+				dy*=.92
+				dr*=.65
 			end,
 			
 			render=function(_ENV)
@@ -1783,14 +1785,14 @@ spawn=function(_ENV)
 end,
 },{__index=_ENV})
 __gfx__
-00000000006dd60000000000000000000000000000c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
-0000000006666660000000000e0000e00e0000e00c0cc0c00202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
-0070070066dddd660000000000eeee0000eeee00c0c66c0c202222020200002002022020020220206000bbb6600888066000000600eeeeee0eeeee0000000000
-00077000d6d88d6d0008000000e00e0000e88e000c6666c0022882200002200000200200002882006b0bb006608880066000000600e00ee0eee00e0000000000
-00077000d6d88d6d0080800000e00e0000e88e000c6666c00228822000022000002002000028820060bb000668800006600000060ee00e0000e00eee00000000
-0070070066dddd660008000000eeee0000eeee00c0c66c0c20222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
-0000000006666660000000000e0000e00e0000e00c0cc0c0020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
-00000000006dd60000000000000000000000000000c00c000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
+000000000007000000000000000000000000000000c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
+0000000000707000000000000e0000e00e0000e00c0cc0c00202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
+00700700070007000000000000eeee0000eeee00c0c66c0c202222020200002002022020020220206000bbb6600888066000000600eeeeee0eeeee0000000000
+00077000070007000008000000e00e0000e88e000c6666c0022882200002200000200200002882006b0bb006608880066000000600e00ee0eee00e0000000000
+00077000077777000080800000e00e0000e88e000c6666c00228822000022000002002000028820060bb000668800006600000060ee00e0000e00eee00000000
+00700700070007000008000000eeee0000eeee00c0c66c0c20222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
+0000000007000700000000000e0000e00e0000e00c0cc0c0020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
+000000000000000000000000000000000000000000c00c000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
 aeaaaaaaaaeaaaaaaaaeaaaaaaaaeaaa000800000e00000000700000eaaaaaae0000000000000000000000000000000000000000100000000000000000000000
 aaeaaaaeaaaeaaaaaaaaeaaaaaaaaeaa0080800000e0000e00700000aeaaaaea0000000000000000000000000000000000000011710000000000000000000000
 aaeeeeeaaaeeeeaeaaeeeeaaaeeeeeaa08eee80000eeeee007770000aaeeeeaa0000000000000000011110000000000000000177710000000000000000000000
