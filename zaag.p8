@@ -17,7 +17,8 @@ dmg={
 	{roid=1.5,flower=1.5,bomb=45,boss=3},--normal
 	{roid=1,flower=1,bomb=30,boss=2},--hard
 }
-laserspeeds={.005,.004,.003}
+laserspeeds={.0025,.002,.0015}
+--laserspeeds={.005,.004,.003}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets
 ps,lz,zs,as,a2,fs,rs,bs={},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
@@ -41,8 +42,8 @@ pthrusting=false --was anybody making the thrust noise last frame?
 seconds,minutes=0,0
 
 --properties shared by p1 and p2
-charge,fullcharge,hopfail,hopfailtick=230,230,false,0
-gun=0 gunfull=120 gunfail=false gunfailtick=0
+charge,fullcharge,hopfail,hopfailtick=460,460,false,0
+gun=0 gunfull=240 gunfail=false gunfailtick=0
 
 --difficulty:1 easy,2 med,3 hard
 
@@ -104,13 +105,13 @@ function _init()
 		add(bs,
 		setmetatable({
 			x=0,y=0,a=0,dx=0,dy=0,enabled=false,
-			r=2,speed=5,parts={},id=i-1,
+			r=2,speed=2.5,parts={},id=i-1,
 			splash=function(_ENV)
 				for i=1,10 do
 					local ps={}
 					ps.x,ps.y=x,y
 					local d,ang=rnd(4),rndr(-.2,.2)
-					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(6)
+					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(12)
 					add(parts,ps)
 				end
 				enabled=false 
@@ -171,11 +172,11 @@ function screenshake_toggle()
 	return true
 end
 
-function _update()
---function _update60()
+--function _update()
+function _update60()
 tick+=1
 
-if tick%30==0 then
+if tick%60==0 then
 	seconds+=1
 	if seconds%60==0 then
 		seconds=0
@@ -427,7 +428,7 @@ for b in all(bs) do
 						l.hit=tick
 						if l.r<3 then
 							shake+=5
-							sleep+=2
+							sleep+=4
 							del(f,l)
 							sfx(43)
 							if #f==0 then del(fs,f) end
@@ -453,7 +454,7 @@ for b in all(bs) do
 						add(a2,z)
 						del(rs,v) 
 						sfx(43)
-						sleep+=2
+						sleep+=4
 					else
 						sfx(42)
 					end
@@ -1545,7 +1546,7 @@ function title_setup()
 	clearlevel()
 	inner.enabled=true
 	local a=rnd()
-	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.005,parts={index=0}})
+	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
 	h:spawn()
 	for i=1,5 do
 		local f={}
