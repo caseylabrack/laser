@@ -12,13 +12,14 @@ __lua__
 -- custom font? for tau
 -- music?
 -- toggle enable flip? 'enable ship flip'
+-- option: skip tau 0
 
 version=53
 _g=_ENV
 dmg={ 
-	{roid=2,flower=2,bomb=60,boss=4},--easy
-	{roid=1.5,flower=1.5,bomb=45,boss=3},--normal
-	{roid=1,flower=1,bomb=30,boss=2},--hard
+	{roid=2,flower=2,bomb=120,boss=4},--easy
+	{roid=1.5,flower=1.5,bomb=90,boss=3},--normal
+	{roid=1,flower=1,bomb=60,boss=2},--hard
 }
 laserspeeds={.0025,.002,.0015}
 --laserspeeds={.005,.004,.003}
@@ -279,7 +280,6 @@ for l in all(lz) do
 		
 		-- hit safezone instead
 		if abs(diff)<30 then 
---			local flag=10
 			circ(s.x,s.y,s.r,10)
 			circfill(s.x,s.y,s.r,10)			
 
@@ -296,7 +296,7 @@ for l in all(lz) do
 	for z in all(l.parts) do
 		z.x+=z.dx z.y+=z.dy
 		z.dx*=.95 z.dy*=.95
-		if tick-z.tick>5 then
+		if tick-z.tick>10 then
 			del(l.parts,z)
 		end
 	end
@@ -316,7 +316,7 @@ for z in all(zs) do
 			z.state="shrinking"
 		end
 	elseif z.state=="shrinking" then
-		z.t-=.25
+		z.t-=.125
 		if z.t<2 then 
 			z.state,z.start,z.dist,z.mstart="moving",z.a,rnd(),tick
 		end
@@ -416,7 +416,7 @@ for b in all(bs) do
 
 	if b.enabled then
 		local x1,y1=b.x,b.y
-		for i=1,5 do
+		for i=1,5 do -- bullet collision
 			b.x,b.y=x1+b.dx*i/5,y1+b.dy*i/5
 			add(b.parts,
 			{x=b.x,y=b.y,t=rnd(3)})
@@ -540,7 +540,7 @@ function died(player,cause)
 		extralives-=1
 		state="death"
 		local a=cocreate(death)
-		coresume(a,15,30)
+		coresume(a,15)
 		add(as,a)
 	end
 end
@@ -657,7 +657,7 @@ end
 
 -- roids
 for v in all(rs) do
-	circ(v.x,v.y,v.r,tick-v.hit>2 and 9 or 7)
+	circ(v.x,v.y,v.r,tick-v.hit>4 and 9 or 7)
 	spr(2,v.x-4,v.y-4)
 	local a=atan2(v.dx,v.dy)-.5
 	local x,y,m=v.x+cos(a)*v.r,
@@ -775,9 +775,9 @@ function wipe_anim()
 	sfx(32)
 --	outer.enabled=false	
 	local start=tick
-	while tick-start<30 do
-		if tick-start==15 then ps[1].enabled=false end
-		local pct=easeinexpo((tick-start)/30)
+	while tick-start<60 do
+		if tick-start==30 then ps[1].enabled=false end
+		local pct=easeinexpo((tick-start)/60)
 --		local pct=(tick-start)/30
 --		pct=easeinexpo(pct)
 		local r=inner.r+(63-inner.r)*pct
@@ -794,7 +794,7 @@ function wipe_anim()
 end
 
 function spawn()
-	state,i,c="setup",10,22
+	state,i,c="setup",20,22
 	for p in all(ps) do
 		p:spawn()
 	end
@@ -818,7 +818,7 @@ function spawn()
 				r.x=64+cos(a)*d r.y=64+sin(a)*d
 				local to_p=atan2(ps[1].x-r.x,ps[1].y-r.y)
 				local a2=aim_away(to_p,.25)
-				local spd=rnd(1.25)+.5
+				local spd=(rnd(1.25)+.5)/2
 				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
 				r.r=3+rnd(8-3) r.enabled=true
 				r.hit=-10
@@ -829,7 +829,7 @@ function spawn()
 			if unit=="safezone" then
 				local a=rnd()
 				add(zs,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,r=32,
-											state="moving",mstart=tick,mdur=180,dist=rnd(),start=a})
+											state="moving",mstart=tick,mdur=360,dist=rnd(),start=a})
 				sfx(10)
 				break
 			end
@@ -847,12 +847,12 @@ function spawn()
 			if unit=="flowers" then
 				local f={}
 				f.tick,f.max=flr(rnd(10)),4
-				f.growgoal=30 --grow rate
-				f.br=150+flr(rnd(100)) --bud rate
+				f.growgoal=60 --grow rate
+				f.br=(150+flr(rnd(100)))*2 --bud rate
 				local r,d={},12+rnd(63-24)
 				local a=aim_away(.25,.25)
 				r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
-				r.growcount=-rnd(30) r.hit=-100
+				r.growcount=-rnd(60) r.hit=-100
 				add(f,r)
 				add(fs,f)
 				sfx(8)
@@ -875,15 +875,15 @@ function spawn()
 	extcmd("rec")
 end
 
-function death(delay,duration)
+function death(delay)
 	yield()
 	while delay>0 do
 		delay-=1
 		yield()
 	end
 	local start=tick
-	while tick-start<duration do
-		local pct=(tick-start)/duration
+	while tick-start<60 do
+		local pct=(tick-start)/60
 		cp=bwp[ceil(pct*#bwp)]
 		yield()
 	end
@@ -899,7 +899,7 @@ function death(delay,duration)
 		add(a2,dethmsg)
 	end
 	while btn()==0 do
-		local pct=min((tick-start)/duration,1)
+		local pct=min((tick-start)/60,1)
 		if pct<=1 then
 			cp=bwp[ceil((1-pct)*#bwp)]
 		else
@@ -954,11 +954,9 @@ function gameover()
 			circ(x,y,1,8)
 		end
 	}
-		local tip=rnd(tips)
---	local tip=tips[ceil(rnd(#tips))]
+	local tip=rnd(tips)
 	while true do
 		c+=1
---		cprint("gameover",64,64-4,7)
 		sspr(22,48,129-22,64-48,64-(129-22)/2,46)
 
 		local xl=tb
@@ -974,8 +972,8 @@ function gameover()
 			xl+=ts
 		end
 
-		if c>30 then -- progress line
-			local pct=min(1,(c-30)/10)
+		if c>60 then -- progress line
+			local pct=min(1,(c-60)/20)
 			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
 		end
 		
@@ -995,7 +993,6 @@ function deathmsg_anim()
 	local msg=rnd(dethmsgs)
 	local ypos=62
 	while true do
---		cprint("razorwing lost.", 64, ypos-24,7)
 		cprint("pilot notes:", 64, ypos-8,7)
 		cprint("\""..smallcaps(msg).."\"",64,ypos,6)
 		local mulls=extralives==1 and " spare" or " spares"
@@ -1037,7 +1034,7 @@ function gamewin_anim()
 	while i>0 do -- delay for boss outro
 		i-=1
 
-		local pct=1-i/90	
+		local pct=1-i/180	
 		boss.detht=pct	
 		local dx,dy=64-boss.steadyx,64-boss.steadyy
 		dx*=.1
@@ -1050,9 +1047,9 @@ function gamewin_anim()
 		
 		yield()
 	end
-	i=60
+	i=120
 	while i>0 do --fade out
-		local pct=1-i/60
+		local pct=1-i/120
 		cp=bwp[ceil(pct*#bwp)]
 		i-=1
 		yield()
@@ -1063,10 +1060,10 @@ function gamewin_anim()
 	
 --	local msg=rnd({"2 ez","gottem","booyah."})
 	local msg=split"gottem,booyah,2 ez."
-	i,cp=90,dp
+	i,cp=180,dp
 	sfx(39)
 	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
-		local pct=i/90
+		local pct=i/180
 --		cp=bwp[ceil(pct*#bwp)]
 		i-=1
 
@@ -1212,7 +1209,7 @@ end
 
 --homing bomb
 h=setmetatable({
-			r=3,dx=0,dy=0,t=.05,
+			r=3,dx=0,dy=0,t=.02,
 			enabled=false,timer=0,
 			frametick=0,
 			spawn=function(_ENV)
@@ -1255,7 +1252,7 @@ h=setmetatable({
 						spr(23,x-4,y-4)
 						_x,_y=rnd(),rnd()
 					else
-						spr((flr(frametick%8)/2)+16,x-4,y-4)
+						spr((flr(frametick%16)/4)+16,x-4,y-4)
 						_x=dx<0 and 1 or 0
 						_y=dy<0 and 1 or 0
 --						pset(x-(dx<0 and 1 or 0),y-(dy<0 and 1 or 0),8)
@@ -1323,7 +1320,7 @@ function initplayers()
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,dr=0,
-			a=.75,t=.2,rt=.0075,r=2,
+			a=.75,t=.1,rt=.00375,r=2,
 			hop=25,
 			enabled=false,thrusting=false,
 --			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
@@ -1372,7 +1369,7 @@ function initplayers()
 --						if ps[2].playing==false then _g.sleep=8 end
 						sfx(22)
 					else
-						if tick-_g.hopfailtick>2 then
+						if tick-_g.hopfailtick>4 then
 							_g.hopfail=true
 							sfx(12)
 							_g.hopfailtick=tick
@@ -1389,7 +1386,7 @@ function initplayers()
 --						_g.shake+=2
 --						sfx(25)
 					else
-						if tick-gunfailtick>2 then
+						if tick-gunfailtick>4 then
 							_g.gunfail=true
 							sfx(12)
 							_g.gunfailtick=tick
@@ -1474,7 +1471,7 @@ function initplayers()
 				for l in all(lines) do
 					l.dx,l.dy=cause.dx or dx,cause.dy or dy
 					l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
-					l.dr=rnd(.05) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
+					l.dr=rnd(.025) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
 					local ang=atan2(l.midx-x,l.midy-y)
 					l.dx+=cos(ang)*.25 l.dy+=sin(ang)*.25
 					l.t=rndr(120,150)
@@ -1553,8 +1550,8 @@ function title_setup()
 	for i=1,5 do
 		local f={}
 		f.tick,f.max=flr(rnd(100)),12
-		f.growgoal=120 --grow rate
-		f.br=500 --bud rate
+		f.growgoal=240 --grow rate
+		f.br=1000 --bud rate
 		local r={}
 		local d,a=12+rnd(63-24),rnd()
 		r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
@@ -1566,7 +1563,7 @@ function title_setup()
 	for i=1,z do
 		local r,a,d={},rnd(),rnd(64-24)+12
 		r.x,r.y=64+cos(a)*d,64+sin(a)*d
-		local a2,spd=rnd(),rnd(1.25)+.5
+		local a2,spd=rnd(),(rnd(1.25)+.5)/2
 		r.dx,r.dy=cos(a2)*spd,sin(a2)*spd
 		r.r,r.enabled,r.hit=3+rnd(8-3),true,-10
 		add(rs,r)
@@ -1619,11 +1616,7 @@ function title_setup()
 			cprint(diffmsg[difficulty],64,80,7)
 			cprint(mulmsg[difficulty],64,88,7)
 		else
---			if tick%90<45 then 
---				cprint("press ❎",65,115,0)
-				cprint("press ❎",64,114,1)
---				print("press ❎",0,122,1)  
---			end
+			cprint("press ❎",64,114,1)
 			if btnp()~=0 then
 				haspressed,c=true,0
 			end
@@ -1663,7 +1656,7 @@ setmetatable({
 enabled=false,
 r=3,steadyx=64,steadyy=64,lasthit=-100,
 spawnnum=3,finalsize=10,
-growdur=80,detht=0,
+growdur=160,detht=0,
 floor={x=64,y=64,r=22},
 	
 update=function(_ENV)
@@ -1694,9 +1687,9 @@ update=function(_ENV)
 			state="spawn"
 		end
 	elseif state=="warn" then
-		if start<30 then
+		if start<60 then
 			start+=1
-			local pct=start/30
+			local pct=start/60
 			for bulge in all(bulges) do
 				local a,d=rnd(),pct*3
 				bulge.x,bulge.y=bulge.tx+cos(a)*d,bulge.ty+sin(a)*d
@@ -1706,7 +1699,7 @@ update=function(_ENV)
 		end
 	elseif state=="fire" then
 		for bulge in all(bulges) do
-			local spd=rnd(1.25)+.5
+			local spd=(rnd(1.25)+.5)/2
 			local a=towardplayer+rndr(-.1,.1)
 			add(rs,{x=bulge.tx,y=bulge.ty,
 											dx=cos(a)*spd,dy=sin(a)*spd,
@@ -1715,9 +1708,9 @@ update=function(_ENV)
 		end
 		state="spawn"
 	elseif state=="intro" then
-		if start<60 then
+		if start<120 then
 			start+=1
-			r=finalsize*start/60
+			r=finalsize*start/120
 		else
 			state="spawn"
 			start=0
@@ -1729,8 +1722,8 @@ update=function(_ENV)
 		dx*=.05 dy*=.05
 		steadyx+=dx steadyy+=dy
 			--bob around
-		local modx=cos(time()/2+.7)*3
-		local mody=cos(time()/3)*3
+		local modx=cos(time()/4+.7)*3
+		local mody=cos(time()/6)*3
 			--final pos	
 		x,y=steadyx+modx,steadyy+mody
 	end
@@ -1746,7 +1739,7 @@ render=function(_ENV)
 	local c=tick-lasthit<10 and 7 or 15
 	local hit=tick-lasthit<10
 	if hit then 
-		if tick%4<2 then
+		if tick%8<4 then
 			pal(14,8)
 		end
 	end
