@@ -5,7 +5,7 @@ __lua__
 -- casey labrack
 
 --todo:
--- 60fps
+
 
 --😐:
 -- unique death animations
@@ -151,6 +151,8 @@ function _init()
 	menuitem(2, "save screenshot", function () extcmd("screen") end)
 	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
+
+	makelvl()
 end
 
 function btns_toggle()
@@ -507,6 +509,7 @@ if ps[1].enabled or ps[2].enabled then
 		sfx(2,-2)
 		if lvl==2 then dset(3,1) end
 		lvl+=1
+--		makelvl()
 		wipe=cocreate(wipe_anim)
 		state="wipe"
 	end
@@ -753,22 +756,23 @@ end
 
 -->8
 --levels
-lvls={
---	[0]={flowers=1},
-	[0]={roids=1,lasers=1},
-	{roids=4,lasers=1},--1
-	{roids=6,lasers=1,safezone=true},--2
-	{roids=4,lasers=1,flowers=2},--3
-	{roids=5,lasers=1,flowers=3},--4
-	{roids=6,lasers=1,flowers=4,safezone=true},--5
-	{roids=4,bomb=true},--6
-	{roids=4,flowers=3,bomb=true},--7
-	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},--8
-	{roids=6,lasers=2},--9
-	{roids=8,lasers=2,safezone=true},--10
-	{roids=6,lasers=2,flowers=2,safezone=true},--11
-	{boss=1,lasers=3,safezone=true} --12
-}
+lvls={roids=2}
+--lvls={
+----	[0]={flowers=1},
+--	[0]={roids=1,lasers=1},
+--	{roids=4,lasers=1},--1
+--	{roids=6,lasers=1,safezone=true},--2
+--	{roids=4,lasers=1,flowers=2},--3
+--	{roids=5,lasers=1,flowers=3},--4
+--	{roids=6,lasers=1,flowers=4,safezone=true},--5
+--	{roids=4,bomb=true},--6
+--	{roids=4,flowers=3,bomb=true},--7
+--	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},--8
+--	{roids=6,lasers=2},--9
+--	{roids=8,lasers=2,safezone=true},--10
+--	{roids=6,lasers=2,flowers=2,safezone=true},--11
+--	{boss=1,lasers=3,safezone=true} --12
+--}
 
 function wipe_anim()
 	yield()
@@ -793,6 +797,50 @@ function wipe_anim()
 	add(as,cocreate(spawn))
 end
 
+--spawn prices
+sprice={
+	roids=1,flowers=2,lasers=2,
+	safezone=-2,nosafezone=0,
+	bomb=3,
+}
+
+function makelvl()
+	budget=7
+	lvls={roids=3}
+
+	while budget>0 do
+
+		local canspawn={}
+		
+		add(canspawn,"roids")
+		
+		if budget>=sprice["flowers"] then
+			add(canspawn,"flowers")
+		end
+		
+		if budget>=sprice["bomb"] and lvls.bomb==nil then
+			add(canspawn, "bomb")
+		end
+		
+		if budget>=sprice["lasers"] then
+			if lvls.lasers==nil or lvls.lasers<3 then
+				add(canspawn,"lasers")
+			end
+		end
+		
+		if lvls.lasers~=nil and lvls.nosafezone==nil then
+			add(canspawn,"safezone")
+			add(canspawn,"nosafezone")
+		end
+		
+		picked=rnd(canspawn)
+		budget-=sprice[picked]
+		lvls[picked]=lvls[picked] and lvls[picked]+1 or 1
+	end
+	--remove anti-safezone marker
+	lvls.nosafezone=nil
+end
+
 function spawn()
 	state,i,c="setup",20,22
 	for p in all(ps) do
@@ -806,7 +854,9 @@ function spawn()
 	while c>0 do c-=1 yield() end
 	inner.enabled=true
 	--spawn each unit type in random order
-	for unit,num in pairs(lvls[lvl]) do
+--	for unit,num in pairs(lvls[lvl]) do
+	for unit,num in pairs(lvls) do
+	
 		c=i --countdown spawn interval
 		while true do
 			c-=1
