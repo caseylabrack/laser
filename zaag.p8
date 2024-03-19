@@ -366,7 +366,7 @@ for p in all(ps) do
 	
 		--player vs. homing bombs
 		for h in all(hs) do
-			if h.enabled and touching(p,h) then 
+			if touching(p,h) then 
 				died(p,h)
 			end		
 		end
@@ -479,11 +479,9 @@ for b in all(bs) do
 				end
 			end
 			for h in all(hs) do
-				if h.enabled and touching(h,b) then
+				if touching(h,b) then
 					sfx(42)
 					b:splash()
-					h.stunned=true
-					h.timer=dmg[difficulty].bomb
 					h.dx+=b.dx/4	h.dy+=b.dy/4
 					goto donebullet			
 				end
@@ -805,14 +803,14 @@ end
 
 --spawn prices
 sprice={
-	roids=1,flowers=2,lasers=2,
+	roids=1,flowers=2,lasers=3,
 	safezone=-2,nosafezone=0,
 	bomb=3,
 }
 
 function makelvl()
 	budget=7
-	lvls={roids=1,bomb=3}
+	lvls={roids=1}
 
 	while budget>0 do
 
@@ -1271,33 +1269,24 @@ end
 function spawnbomb() 
 	return setmetatable({
 			r=3,dx=0,dy=0,t=.025,
-			enabled=false,timer=0,
-			frametick=0,state="idle",
+			frametick=0,state="idle",muted=false,
 			spawn=function(_ENV)
 				local a,d=aim_away(.25,.6),rnd(64-24)+12
-				x,y,dx,dy,enabled,
-				timer,frametick,stunnned=
-				64+cos(a)*d,64+sin(a)*d,0,0,
-				true,0,0,false
+				x,y,dx,dy,frametick=
+				64+cos(a)*d,64+sin(a)*d,0,0,0
 			end,
 			
 			update=function(_ENV)
-				if not enabled then return end
-				if stunned then
-					timer-=1
-					if timer<0 then stunned=false end
+				local target=closestplayer(h)
+				local d=dist(x,y,target.x,target.y)
+				if d<32 then
+					if state~="chase" and not muted then sfx(9) end
+					state="chase"
+					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+					dx+=cos(a)*t dy+=sin(a)*t
+					frametick+=1
 				else
-					local target=closestplayer(h)
-					local d=dist(x,y,target.x,target.y)
-					if d<32 then
-						if state~="chase" then sfx(9) end
-						state="chase"
-						local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
-						dx+=cos(a)*t dy+=sin(a)*t
-						frametick+=1
-					else
-						state="idle"
-					end
+					state="idle"
 				end
 --				dx*=.99 dy*=.99
 				dx*=.97 dy*=.97
@@ -1312,24 +1301,18 @@ function spawnbomb()
 			end,
 			
 			render=function(_ENV)
-				if enabled then
-					palt(10,true)
-					palt(0,false)
-					local _x,_y=0,0
-					if stunned or state~="chase" then
-						spr(23,x-4,y-4)
-						_x,_y=rnd(),rnd()
-					else
-						if state=="chase" then
-							spr((flr(frametick%16)/4)+16,x-4,y-4)
-							_x=dx<0 and 1 or 0
-							_y=dy<0 and 1 or 0
-							
-						end
-					end
+				palt(10,true)
+				palt(0,false)
+				local _x,_y=0,0
+				if state~="chase" then
+					spr((tick%120)/60+3,x-4,y-4)
+				else
+					spr(frametick%16/4+16,x-4,y-4)
+					_x=dx<0 and 1 or 0
+					_y=dy<0 and 1 or 0
 					pset(x-_x,y-_y,8)
-					palt()
 				end
+				palt()
 			end,
 		},{__index=_ENV})
 end
@@ -1672,6 +1655,7 @@ function title_setup()
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
 	h=spawnbomb()
+	h.muted=true
 	h:spawn()
 	add(hs,h)
 	for i=1,5 do
@@ -1905,14 +1889,14 @@ spawn=function(_ENV)
 end,
 },{__index=_ENV})
 __gfx__
-000000000007000000000000aaaaaaaa0000000000c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
-000000000070700000000000aaaaaaaa000000000c0cc0c00202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
-007007000700070000000000aaeeeeaa00000000c0c66c0c202222020200002002022020020220206000bbb6600888066000000600eeeeee0eeeee0000000000
-000770000700070000080000aae00eaa000000000c6666c0022882200002200000200200002882006b0bb006608880066000000600e00ee0eee00e0000000000
-000770000777770000808000aae00eaa000000000c6666c00228822000022000002002000028820060bb000668800006600000060ee00e0000e00eee00000000
-007007000700070000080000aaeeeeaa00000000c0c66c0c20222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
-000000000700070000000000aaaaaaaa000000000c0cc0c0020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
-000000000000000000000000aaaaaaaa0000000000c00c000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
+000000000007000000000000eaaaaaaeeaaaaaae00c00c000020020000000000000000000000000066666666666666666666666600e000000000e00000000000
+000000000070700000000000aeaaaaeaaeaaaaea0c0cc0c00202202000200200002002000020020060000bb6600008866000000600ee00000000ee0000000000
+007007000700070000000000aaeeeeaaaaeeeeaac0c66c0c202222020200002002022020020220206000bbb6600888066000000600eeeeee0eeeee0000000000
+000770000700070000080000aae08eaaaae80eaa0c6666c0022882200002200000200200002882006b0bb006608880066000000600e00ee0eee00e0000000000
+000770000777770000808000aae80eaaaae08eaa0c6666c00228822000022000002002000028820060bb000668800006600000060ee00e0000e00eee00000000
+007007000700070000080000aaeeeeaaaaeeeeaac0c66c0c20222202020000200202202002022020666666666666666666666666eeeeee0000eeeee000000000
+000000000700070000000000aeaaaaeaaeaaaaea0c0cc0c0020220200020020000200200002002000000000000000000000000000000ee0000ee000000000000
+000000000000000000000000eaaaaaaeeaaaaaae00c00c000020020000000000000000000000000000000000000000000000000000000e00000e000000000000
 aeaaaaaaaaeaaaaaaaaeaaaaaaaaeaaa000800000e00000000700000eaaaaaae0000000000000000000000000000000000000000100000000000000000000000
 aaeaaaaeaaaeaaaaaaaaeaaaaaaaaeaa0080800000e0000e00700000aeaaaaea0000000000000000000000000000000000000011710000000000000000000000
 aaeeeeeaaaeeeeaeaaeeeeaaaeeeeeaa08eee80000eeeee007770000aaeeeeaa0000000000000000011110000000000000000177710000000000000000000000
