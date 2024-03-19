@@ -23,8 +23,8 @@ dmg={
 }
 laserspeeds={.0025,.002,.0015}
 --laserspeeds={.005,.004,.003}
---players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets
-ps,lz,zs,as,a2,fs,rs,bs={},{},{},{},{},{},{},{}
+--players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
+ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
 lvl,mulligans=1,1
 extralives=mulligans
@@ -336,7 +336,9 @@ for z in all(zs) do
 end
 
 --homing bomb move
-h:update()
+for h in all(hs) do
+	h:update()	
+end
 
 for p in all(ps) do
 
@@ -363,8 +365,10 @@ for p in all(ps) do
 		end
 	
 		--player vs. homing bombs
-		if h.enabled and touching(p,h) then 
-			died(p,h)
+		for h in all(hs) do
+			if h.enabled and touching(p,h) then 
+				died(p,h)
+			end		
 		end
 		
 		--player vs. boss
@@ -474,13 +478,15 @@ for b in all(bs) do
 					goto donebullet
 				end
 			end
-			if h.enabled and touching(h,b) then
-				sfx(42)
-				b:splash()
-				h.stunned=true
-				h.timer=dmg[difficulty].bomb
-				h.dx+=b.dx/4	h.dy+=b.dy/4
-				goto donebullet
+			for h in all(hs) do
+				if h.enabled and touching(h,b) then
+					sfx(42)
+					b:splash()
+					h.stunned=true
+					h.timer=dmg[difficulty].bomb
+					h.dx+=b.dx/4	h.dy+=b.dy/4
+					goto donebullet			
+				end
 			end
 			if boss.enabled and touching(boss,b) then
 				boss.hp-=dmg[difficulty].boss
@@ -604,10 +610,7 @@ for z in all(zs) do
 end
 
 pal()
---if outer.enabled then
-	circ(64,64,outer_r,6)
---	circle(outer.x,outer.y,outer.r,6)
---end
+circ(64,64,outer_r,6)
 pal(cp)
 
 --laser
@@ -648,7 +651,10 @@ if state~="dead" and inner.enabled then
 end
 
 --homing bombs
-h:render()
+--h:render()
+for h in all(hs) do
+	h:render()
+end
 
 --player
 for p in all(ps) do
@@ -805,8 +811,8 @@ sprice={
 }
 
 function makelvl()
-	budget=7
-	lvls={roids=3}
+	budget=-1
+	lvls={roids=1,bomb=3}
 
 	while budget>0 do
 
@@ -890,9 +896,12 @@ function spawn()
 				if #lz==num then break end
 			end
 			if unit=="bomb" then
+--				h:spawn()
+				h=spawnbomb()
 				h:spawn()
+				add(hs,h)
 				sfx(9)
-				break
+				if #hs==num then break end
 			end
 			if unit=="flowers" then
 				local f={}
@@ -1134,7 +1143,8 @@ function gamewin_anim()
 end
 
 function clearlevel()		
-		lz,zs,h.enabled,rs,fs={},{},false,{},{}
+		lz,zs,hs,rs,fs={},{},{},{},{}
+--		lz,zs,h.enabled,rs,fs={},{},false,{},{}
 		for b in all(bs) do
 			b.enabled=false b.parts={}
 		end 
@@ -1258,7 +1268,8 @@ end
 --misc
 
 --homing bomb
-h=setmetatable({
+function spawnbomb() 
+	return setmetatable({
 			r=3,dx=0,dy=0,t=.02,
 			enabled=false,timer=0,
 			frametick=0,
@@ -1281,7 +1292,8 @@ h=setmetatable({
 						dx+=cos(a)*t dy+=sin(a)*t
 						frametick+=1
 					end
-					dx*=.97 dy*=.97
+					dx*=.99 dy*=.99
+--					dx*=.97 dy*=.97
 					x+=dx	y+=dy
 					local a2=atan2(x-64,y-64)
 					if dist(x,y,64,64)<8 then
@@ -1312,6 +1324,61 @@ h=setmetatable({
 				end
 			end,
 		},{__index=_ENV})
+end
+--h=setmetatable({
+--			r=3,dx=0,dy=0,t=.02,
+--			enabled=false,timer=0,
+--			frametick=0,
+--			spawn=function(_ENV)
+--				local a,d=aim_away(.25,.6),rnd(64-24)+12
+--				x,y,dx,dy,enabled,
+--				timer,frametick,stunnned=
+--				64+cos(a)*d,64+sin(a)*d,0,0,
+--				true,0,0,false
+--			end,
+--			
+--			update=function(_ENV)
+--				if enabled then
+--					if stunned then
+--						timer-=1
+--						if timer<0 then stunned=false end
+--					else
+--						local target=closestplayer(h)
+--						local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+--						dx+=cos(a)*t dy+=sin(a)*t
+--						frametick+=1
+--					end
+--					dx*=.97 dy*=.97
+--					x+=dx	y+=dy
+--					local a2=atan2(x-64,y-64)
+--					if dist(x,y,64,64)<8 then
+--						x,y=64+cos(a2)*8,64+sin(a2)*8
+--					end
+--					if dist(x,y,64,64)>63 then
+--						x,y=64+cos(a2)*63,64+sin(a2)*63
+--					end
+--				end
+--			end,
+--			
+--			render=function(_ENV)
+--				if enabled then
+--					palt(10,true)
+--					palt(0,false)
+--					local _x,_y=0,0
+--					if stunned then
+--						spr(23,x-4,y-4)
+--						_x,_y=rnd(),rnd()
+--					else
+--						spr((flr(frametick%16)/4)+16,x-4,y-4)
+--						_x=dx<0 and 1 or 0
+--						_y=dy<0 and 1 or 0
+----						pset(x-(dx<0 and 1 or 0),y-(dy<0 and 1 or 0),8)
+--					end
+--					pset(x-_x,y-_y,8)
+--					palt()
+--				end
+--			end,
+--		},{__index=_ENV})
 
 
 --palettes
@@ -1596,7 +1663,9 @@ function title_setup()
 	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
+	h=spawnbomb()
 	h:spawn()
+	add(hs,h)
 	for i=1,5 do
 		local f={}
 		f.tick,f.max=flr(rnd(100)),12
