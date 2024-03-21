@@ -5,7 +5,9 @@ __lua__
 -- casey labrack
 
 --todo:
-
+-- boss hit palette bug?
+-- weapon/tele ready ship palette 
+-- new gameover screen
 
 --😐:
 -- unique death animations
@@ -13,13 +15,19 @@ __lua__
 -- music?
 -- toggle enable flip? 'enable ship flip'
 -- option: skip tau 0
+-- do away with difficulty?
+-- mulligans? (if you die within one sec)
+-- cutscene fuzzy dice
+-- gameover progress of enemy sprites
+--  with boss at the end of line
+-- probably longer tele range
 
 version=53
 _g=_ENV
 dmg={ 
-	{roid=2,flower=2,bomb=120,boss=4},--easy
-	{roid=1.5,flower=1.5,bomb=90,boss=3},--normal
-	{roid=1,flower=1,bomb=60,boss=2},--hard
+	{roid=2,flower=2,bomb=2,boss=4},--easy
+	{roid=1.5,flower=1.5,bomb=3,boss=3},--normal
+	{roid=1,flower=1,bomb=4,boss=2},--hard
 }
 laserspeeds={.0025,.002,.0015}
 --laserspeeds={.005,.004,.003}
@@ -152,7 +160,7 @@ function _init()
 	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
 
-	makelvl()
+--	makelvl()
 end
 
 function btns_toggle()
@@ -482,7 +490,7 @@ for b in all(bs) do
 				if touching(h,b) then
 					sfx(42)
 					b:splash()
-					h.dx+=b.dx/4	h.dy+=b.dy/4
+					h.dx+=b.dx/dmg[difficulty].bomb	h.dy+=b.dy/dmg[difficulty].bomb
 					goto donebullet			
 				end
 			end
@@ -513,7 +521,7 @@ if ps[1].enabled or ps[2].enabled then
 		sfx(2,-2)
 		if lvl==2 then dset(3,1) end
 		lvl+=1
---		makelvl()
+		makelvl()
 		wipe=cocreate(wipe_anim)
 		state="wipe"
 	end
@@ -652,6 +660,9 @@ end
 --h:render()
 for h in all(hs) do
 	h:render()
+	fillp(…)
+	circ(h.x,h.y,h.sight,14)
+	fillp()
 end
 
 --player
@@ -760,7 +771,7 @@ end
 
 -->8
 --levels
-lvls={roids=2}
+--lvls={flowers=1}
 --lvls={
 ----	[0]={flowers=1},
 --	[0]={roids=1,lasers=1},
@@ -803,35 +814,31 @@ end
 
 --spawn prices
 sprice={
-	roids=1,flowers=2,lasers=3,
-	safezone=-2,nosafezone=0,
-	bomb=3,
+	roids=2,flowers=1,lasers=3,
+	safezone=-1,nosafezone=0,
+	bomb=2,
 }
 
 function makelvl()
-	budget=7
-	lvls={roids=1}
+	budget=lvl+2
+	lvls={roids=3}
 
 	while budget>0 do
 
 		local canspawn={}
 		
 		add(canspawn,"roids")
-		
 		if budget>=sprice["flowers"] then
 			add(canspawn,"flowers")
 		end
-		
-		if budget>=sprice["bomb"] and lvls.bomb==nil then
+		if budget>=sprice["bomb"] then
 			add(canspawn, "bomb")
 		end
-		
 		if budget>=sprice["lasers"] then
 			if lvls.lasers==nil or lvls.lasers<3 then
 				add(canspawn,"lasers")
 			end
 		end
-		
 		if lvls.lasers~=nil and lvls.nosafezone==nil then
 			add(canspawn,"safezone")
 			add(canspawn,"nosafezone")
@@ -843,6 +850,8 @@ function makelvl()
 	end
 	--remove anti-safezone marker
 	lvls.nosafezone=nil
+	if lvl==0 then lvls={flowers=1} end
+	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
 end
 
 function spawn()
@@ -1268,7 +1277,7 @@ end
 --homing bomb
 function spawnbomb() 
 	return setmetatable({
-			r=3,dx=0,dy=0,t=.025,
+			r=3,dx=0,dy=0,t=.03,sight=48,
 			frametick=0,state="idle",muted=false,
 			spawn=function(_ENV)
 				local a,d=aim_away(.25,.6),rnd(64-24)+12
@@ -1279,7 +1288,7 @@ function spawnbomb()
 			update=function(_ENV)
 				local target=closestplayer(h)
 				local d=dist(x,y,target.x,target.y)
-				if d<32 then
+				if d<sight then
 					if state~="chase" and not muted then sfx(9) end
 					state="chase"
 					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
@@ -1755,6 +1764,7 @@ function title_setup()
 	-- play tau 0 if noob or on practice difficulty
 	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
 
+	makelvl()
 	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
