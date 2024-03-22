@@ -20,7 +20,7 @@ __lua__
 -- cutscene fuzzy dice
 -- gameover progress of enemy sprites
 --  with boss at the end of line
--- probably longer tele range
+-- "return of zaag"?
 
 version=53
 _g=_ENV
@@ -30,7 +30,6 @@ dmg={
 	{roid=1,flower=1,bomb=4,boss=2},--hard
 }
 laserspeeds={.0025,.002,.0015}
---laserspeeds={.005,.004,.003}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
 ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
@@ -91,7 +90,6 @@ tips={
 	{"remember to take","15 minute breaks!"},
 	{"zaag is a fun game"},
 	{"very close range shots","= very fast rate of fire"},
---	{"quick flip (⬇️) is","faster than doing a 180"},
 	{"pause screen has some","additional options"},
 	{"real winners","say no to drugs"},
 	{"blaster has warm up,","tele is charged at start"},
@@ -156,11 +154,9 @@ function _init()
 	
 	title=cocreate(title_setup)
 	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
-	menuitem(2, "save screenshot", function () extcmd("screen") end)
+--	menuitem(2, "save screenshot", function () extcmd("screen") end)
 	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
-	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
-
---	makelvl()
+--	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
 end
 
 function btns_toggle()
@@ -180,12 +176,12 @@ function dethgiftoggle()
 	return true
 end
 
-function screenshake_toggle()
-	screenshake=not screenshake
-	menuitem(4, screenshake==true and "screenshake: on" or "screenshake: off",screenshake_toggle)
-	dset(4,screenshake==true and 0 or 1)
-	return true
-end
+--function screenshake_toggle()
+--	screenshake=not screenshake
+--	menuitem(4, screenshake==true and "screenshake: on" or "screenshake: off",screenshake_toggle)
+--	dset(4,screenshake==true and 0 or 1)
+--	return true
+--end
 
 function _update60()
 tick+=1
@@ -601,18 +597,25 @@ for z in all(zs) do
 	end
 end
 
---clip game artwork (safezones) to circle
-circfill(64,64,outer_r,0 | 0x1800)
-
 --do animations
 for z in all(a2) do
 	if costatus(z)!="dead" then assert(coresume(z))
 	else del(a2,z) end
 end
 
---safezone bot
-for z in all(zs) do
-	spr(5,z.x-4,z.y-4)
+--homing bombs radius
+for h in all(hs) do
+	fillp(…)
+	circ(h.x,h.y,h.sight,14)
+	fillp()
+end
+
+--clip game artwork (safezones) to circle
+circfill(64,64,outer_r,0 | 0x1800)
+
+--homing bombs
+for h in all(hs) do
+	h:render()
 end
 
 pal()
@@ -656,13 +659,17 @@ if state~="dead" and inner.enabled then
 	circ(64,64,inner.r,6)
 end
 
---homing bombs
---h:render()
-for h in all(hs) do
-	h:render()
-	fillp(…)
-	circ(h.x,h.y,h.sight,14)
-	fillp()
+--boss
+boss:render()
+
+--bullet
+for b in all(bs) do
+	b:render()
+end
+
+--safezone bot
+for z in all(zs) do
+	spr(5,z.x-4,z.y-4)
 end
 
 --player
@@ -682,14 +689,6 @@ for v in all(rs) do
 													v.y+sin(a)*v.r,
 													dist(0,0,v.dx,v.dy)*3
 	line(x,y,x+cos(a)*m,y+sin(a)*m)
-end
-
---boss
-boss:render()
-
---bullet
-for b in all(bs) do
-	b:render()
 end
 
 if wipe and costatus(wipe)~="dead" then coresume(wipe) end
@@ -855,7 +854,7 @@ function makelvl()
 end
 
 function spawn()
-	state,i,c="setup",20,22
+	state,i,c="setup",20,42
 	for p in all(ps) do
 		p:spawn()
 	end
@@ -991,57 +990,57 @@ end
 function gameover()
 	local start=tick
 	local c=0
-	local tw=60--trackwidth
-	local tt=5 --ticks total
-	local ts=tw/4--tick spacing
-	local tb=64-tw/2 --ticks begin
-	local yt=68 --tracks y pos
-	local mascots={
-		[1]=function(x,y) --roid
-			circ(x,y,3,9)
-			spr(2,x-4,y-4)
-		end,
-		[2]=function(x,y) --flower
-			fillp(ˇ)
-			circfill(x,y,4,11)
-			fillp()
-			spr(20,x-4,y-4)
-		end,
-		[3]=function(x,y) --bomb
-			spr(21,x-4,y-4)
-		end,
-		[4]=function(x,y) --double
-			line(x-3,y-3,x+3,y+3,8)
-			circfill(x,y,1,0)
-			circ(x,y,1,6)
-		end,
-		[5]=function(x,y) --boss
-			circ(x,y,4,14)
-			circ(x,y,1,8)
-		end
-	}
+--	local tw=60--trackwidth
+--	local tt=5 --ticks total
+--	local ts=tw/4--tick spacing
+--	local tb=64-tw/2 --ticks begin
+	local yt=54 --tracks y pos
+--	local mascots={
+--		[1]=function(x,y) --roid
+--			circ(x,y,3,9)
+--			spr(2,x-4,y-4)
+--		end,
+--		[2]=function(x,y) --flower
+--			fillp(ˇ)
+--			circfill(x,y,4,11)
+--			fillp()
+--			spr(20,x-4,y-4)
+--		end,
+--		[3]=function(x,y) --bomb
+--			spr(21,x-4,y-4)
+--		end,
+--		[4]=function(x,y) --double
+--			line(x-3,y-3,x+3,y+3,8)
+--			circfill(x,y,1,0)
+--			circ(x,y,1,6)
+--		end,
+--		[5]=function(x,y) --boss
+--			circ(x,y,4,14)
+--			circ(x,y,1,8)
+--		end
+--	}
 	local tip=rnd(tips)
 	while true do
 		c+=1
-		sspr(22,48,129-22,64-48,64-(129-22)/2,46)
+		sspr(22,48,107,16,10,46)
 
-		local xl=tb
-		for i=1,5 do --draw 5 ticks
-			line(xl,yt,xl,yt+2,7)
-			if lvl < (i-1)*3 then
-				for j=0,15 do
-					pal(j,1)
-				end
-			end
-			mascots[i](xl,yt+8)
-			pal(cp)
-			xl+=ts
-		end
+--		local xl=tb
+--		for i=1,5 do --draw 5 ticks
+--			line(xl,yt,xl,yt+2,7)
+--			if lvl < (i-1)*3 then
+--				for j=0,15 do
+--					pal(j,1)
+--				end
+--			end
+--			mascots[i](xl,yt+8)
+--			pal(cp)
+--			xl+=ts
+--		end
 
-		if c>60 then -- progress line
-			local pct=min(1,(c-60)/20)
-			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
-		end
+--		if c>60 then -- progress line
+--			local pct=min(1,(c-60)/20)
+--			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
+--		end
 		
 		local ystart=yt+18
 		for i=1,#tip do
@@ -1325,61 +1324,6 @@ function spawnbomb()
 			end,
 		},{__index=_ENV})
 end
---h=setmetatable({
---			r=3,dx=0,dy=0,t=.02,
---			enabled=false,timer=0,
---			frametick=0,
---			spawn=function(_ENV)
---				local a,d=aim_away(.25,.6),rnd(64-24)+12
---				x,y,dx,dy,enabled,
---				timer,frametick,stunnned=
---				64+cos(a)*d,64+sin(a)*d,0,0,
---				true,0,0,false
---			end,
---			
---			update=function(_ENV)
---				if enabled then
---					if stunned then
---						timer-=1
---						if timer<0 then stunned=false end
---					else
---						local target=closestplayer(h)
---						local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
---						dx+=cos(a)*t dy+=sin(a)*t
---						frametick+=1
---					end
---					dx*=.97 dy*=.97
---					x+=dx	y+=dy
---					local a2=atan2(x-64,y-64)
---					if dist(x,y,64,64)<8 then
---						x,y=64+cos(a2)*8,64+sin(a2)*8
---					end
---					if dist(x,y,64,64)>63 then
---						x,y=64+cos(a2)*63,64+sin(a2)*63
---					end
---				end
---			end,
---			
---			render=function(_ENV)
---				if enabled then
---					palt(10,true)
---					palt(0,false)
---					local _x,_y=0,0
---					if stunned then
---						spr(23,x-4,y-4)
---						_x,_y=rnd(),rnd()
---					else
---						spr((flr(frametick%16)/4)+16,x-4,y-4)
---						_x=dx<0 and 1 or 0
---						_y=dy<0 and 1 or 0
-----						pset(x-(dx<0 and 1 or 0),y-(dy<0 and 1 or 0),8)
---					end
---					pset(x-_x,y-_y,8)
---					palt()
---				end
---			end,
---		},{__index=_ENV})
-
 
 --palettes
 dp={ --default
@@ -1438,43 +1382,29 @@ function initplayers()
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,dr=0,
 			a=.75,t=.1,rt=.00375,r=2,
-			hop=25,
+			hop=30,
 			enabled=false,thrusting=false,
---			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
---			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
 			spawnticks=0,
 			
 			update=function(_ENV)
 				if not enabled then return end
---				gun=min(gun+1,gunfull)
 				if btn(➡️,id) then 
---					a-=rt
 					dr-=rt 
 				end
 				if btn(⬅️,id) then 
---					a+=rt 
 					dr+=rt
 				end
---				if btn(⬇️,id) then
---					if tick-fliplast>flipready then
---					 a+=.5
---					 fliplast=tick
---				 end
---				end
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
 					if not thrusting then
 						thrusting=true
---						sfx(2)
 					end
 				else
---					sfx(2,-2)
 					thrusting=false
 				end
 				if btn(tele_btn,id) then
---				if btn(⬆️,id) then
 				 if _g.charge>_g.fullcharge then
 						local lines=coords(_ENV)
 						x+=cos(a)*hop
@@ -1483,7 +1413,6 @@ function initplayers()
 						_g.blink=cocreate(blink_anim)
 						coresume(_g.blink,lines)
 						_g.charge=0
---						if ps[2].playing==false then _g.sleep=8 end
 						sfx(22)
 					else
 						if tick-_g.hopfailtick>4 then
@@ -1500,8 +1429,6 @@ function initplayers()
 						b.x,b.y,b.a=x,y,a
 						b.dx,b.dy=cos(b.a)*b.speed,sin(b.a)*b.speed
 						sfx(44)
---						_g.shake+=2
---						sfx(25)
 					else
 						if tick-gunfailtick>4 then
 							_g.gunfail=true
@@ -1546,9 +1473,9 @@ function initplayers()
 					end
 					t=easeoutexpo(t)
 					line(x,y,x+30*t,y)
-					line(x,y,x-30*t,y)
+					line(x-30*t,y)
 					line(x,y,x,y+30*t)
-					line(x,y,x,y-30*t)
+					line(x,y-30*t)
 					circfill(x,y,t*4)
 				end
 --				circ(x,y,r,10)
@@ -1690,9 +1617,7 @@ function title_setup()
 	end
 	yield()
 	
-	local col1,col2={14,8,2,1},{1,2,8,14}
-	local frate,scany,
-							haspressed,c=.1,0,false,0
+	local haspressed,c=false,0
 	
 	while c<30 or not ((btn(❎) or btn(🅾️)) and haspressed) do
 		c+=1
@@ -1701,17 +1626,9 @@ function title_setup()
 			ps[1].x,ps[1].y=rnd(128),rnd(128)
 		end
 
---spritesheet coords
-		local sc={x=69,y=8,x2=119,y2=47}
-		sc.w,sc.h=sc.x2-sc.x+1,sc.y2-sc.y+1
---	screen coords
-		local tc={x=39,y=18,w=sc.w,h=sc.h}
-	
 		pal(1,8)
 		pal(7,0)
-		sspr(sc.x,sc.y,sc.w,sc.h,tc.x,tc.y)
-
---scan line down the logotype
+		sspr(69,8,51,40,39,18)
 		pal()
 
 		--difficulty choose
