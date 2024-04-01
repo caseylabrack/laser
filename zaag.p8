@@ -6,8 +6,6 @@ __lua__
 
 --todo:
 -- boss hit palette bug?
--- weapon/tele ready ship palette 
--- try eliminating difficulty
 -- intro
 
 --😐:
@@ -30,28 +28,12 @@ __lua__
 
 version=53
 _g=_ENV
-dmg={ 
-	{roid=2,flower=2,bomb=2,boss=4},--easy
-	{roid=1.5,flower=1.5,bomb=3,boss=3},--normal
-	{roid=1,flower=1,bomb=4,boss=2},--hard
-}
 laserspeeds={.0025,.002,.0015}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
 ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
-lvl,mulligans=1,1
+mulligans=2
 extralives=mulligans
-mulldiff={2,1,0} --how many mulligans for each difficulty
-mulmsg={ --titlescreen mulligan description
-"(2 spares, 2x pwr)",
-"(1 spare, 1.5x pwr)",
-"(0 spares, 1x pwr)",
-}
-diffmsg={--titlescreen difficulty description
-"difficulty: practice",
-"difficulty: challenge",
-"difficulty: prestige",
-}
 tick,state=0,"title"
 cp=dp--current pallete
 sleep,shake=0,0
@@ -218,7 +200,6 @@ end
 
 charge+=1
 gun+=1
---gun=min(gun+1,gunfull)
 boss:update()
 
 -- play rocket noise (only once) if either is rocketing
@@ -441,9 +422,7 @@ for b in all(bs) do
 				for l in all(f) do --leaves
 					if touching(b,l) then
 						b:splash()
-	--					sfx(24)
---						sfx(21)
-						l.r-=dmg[difficulty].flower
+						l.r-=1.5
 						l.growcount=0
 						l.hit=tick
 						if l.r<3 then
@@ -464,7 +443,7 @@ for b in all(bs) do
 					b:splash()
 --					sfx(21)					
 					local oldr=v.r
-					v.r-=dmg[difficulty].roid
+					v.r-=1.5
 					v.hit=tick
 --					shake+=5
 					if v.r<3 then	
@@ -493,12 +472,12 @@ for b in all(bs) do
 				if touching(h,b) then
 					sfx(42)
 					b:splash()
-					h.dx+=b.dx/dmg[difficulty].bomb	h.dy+=b.dy/dmg[difficulty].bomb
+					h.dx+=b.dx/2	h.dy+=b.dy/2
 					goto donebullet			
 				end
 			end
 			if boss.enabled and touching(boss,b) then
-				boss.hp-=dmg[difficulty].boss
+				boss.hp-=2
 				boss.lasthit=tick
 				b:splash()
 				sfx(42)
@@ -663,7 +642,8 @@ end
 --emitter
 if state~="dead" and inner.enabled then
 	circfill(64,64,inner.r,0)
-	circ(64,64,inner.r,6)
+--	circ(64,64,inner.r,6)
+	circle(64,64,inner.r,6)
 end
 
 --boss
@@ -776,35 +756,15 @@ if title and costatus(title)~="dead" then coresume(title) end
 end
 
 -->8
---levels
---lvls={flowers=1}
---lvls={
-----	[0]={flowers=1},
---	[0]={roids=1,lasers=1},
---	{roids=4,lasers=1},--1
---	{roids=6,lasers=1,safezone=true},--2
---	{roids=4,lasers=1,flowers=2},--3
---	{roids=5,lasers=1,flowers=3},--4
---	{roids=6,lasers=1,flowers=4,safezone=true},--5
---	{roids=4,bomb=true},--6
---	{roids=4,flowers=3,bomb=true},--7
---	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},--8
---	{roids=6,lasers=2},--9
---	{roids=8,lasers=2,safezone=true},--10
---	{roids=6,lasers=2,flowers=2,safezone=true},--11
---	{boss=1,lasers=3,safezone=true} --12
---}
+--transitions
 
 function wipe_anim()
 	yield()
 	sfx(32)
---	outer.enabled=false	
 	local start=tick
 	while tick-start<60 do
 		if tick-start==30 then ps[1].enabled=false end
 		local pct=easeinexpo((tick-start)/60)
---		local pct=(tick-start)/30
---		pct=easeinexpo(pct)
 		local r=inner.r+(63-inner.r)*pct
 		circfill(64,64,r,0)
 		circ(64,64,r,6)
@@ -877,7 +837,6 @@ function spawn()
 	while c>0 do c-=1 yield() end
 	inner.enabled=true
 	--spawn each unit type in random order
---	for unit,num in pairs(lvls[lvl]) do
 	for unit,num in pairs(lvls) do
 	
 		c=i --countdown spawn interval
@@ -988,7 +947,7 @@ function death(delay)
 	if extralives<0 then
 		del(a2,gameoveranimation)
 		lvl=1
-		extralives=mulligans
+		extralives=2
 		state="title"
 		title=cocreate(title_setup)
 	else
@@ -1001,57 +960,11 @@ end
 function gameover()
 	local start=tick
 	local c=0
---	local tw=60--trackwidth
---	local tt=5 --ticks total
---	local ts=tw/4--tick spacing
---	local tb=64-tw/2 --ticks begin
 	local yt=54 --tracks y pos
---	local mascots={
---		[1]=function(x,y) --roid
---			circ(x,y,3,9)
---			spr(2,x-4,y-4)
---		end,
---		[2]=function(x,y) --flower
---			fillp(ˇ)
---			circfill(x,y,4,11)
---			fillp()
---			spr(20,x-4,y-4)
---		end,
---		[3]=function(x,y) --bomb
---			spr(21,x-4,y-4)
---		end,
---		[4]=function(x,y) --double
---			line(x-3,y-3,x+3,y+3,8)
---			circfill(x,y,1,0)
---			circ(x,y,1,6)
---		end,
---		[5]=function(x,y) --boss
---			circ(x,y,4,14)
---			circ(x,y,1,8)
---		end
---	}
 	local tip=rnd(tips)
 	while true do
 		c+=1
 		sspr(22,48,107,16,10,46)
-
---		local xl=tb
---		for i=1,5 do --draw 5 ticks
---			line(xl,yt,xl,yt+2,7)
---			if lvl < (i-1)*3 then
---				for j=0,15 do
---					pal(j,1)
---				end
---			end
---			mascots[i](xl,yt+8)
---			pal(cp)
---			xl+=ts
---		end
-
---		if c>60 then -- progress line
---			local pct=min(1,(c-60)/20)
---			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
---		end
 		
 		local ystart=yt+18
 		for i=1,#tip do
@@ -1062,7 +975,7 @@ function gameover()
 		end
 		yield()
 	end
-	extralives=mulligans
+--	extralives=mullig
 end
 
 function deathmsg_anim()
@@ -1658,34 +1571,15 @@ function title_setup()
 		pal()
 
 		--difficulty choose
-		if haspressed then
-			if btnp(⬅️) or btnp(⬇️) then
-				difficulty=mid(1,difficulty-1,3)
-			end			
-			if btnp(➡️) or btnp(⬆️) then
-				difficulty=mid(1,difficulty+1,3)
-			end
-			
-			local xoff,yoff,w,h=14,76,98,20
-			for x=1,w do
-				for y=1,h do
-					if pget(x+xoff,y+yoff)~=0 then
-						pset(x+xoff,y+yoff,1)
-					end
-				end
-			end
-
-			rect(xoff,yoff,xoff+w,yoff+h,1)
-			cprint(diffmsg[difficulty],64,80,7)
-			cprint(mulmsg[difficulty],64,88,7)
-		else
-			cprint("press ❎",64,114,1)
-			if btnp()~=0 then
-				haspressed,c=true,0
-			end
+		cprint("press ❎",64,114,1)
+		if btnp()~=0 then
+--			haspressed,c=true,0
+			break
 		end
 		
-		if btnp()>255 then --bitfield where high bits are p2
+		--p2 controller button press detect
+		--for p2 join
+		if btnp()>255 then 
 			ps[2].playing=not ps[2].playing
 		end
 		
@@ -1694,21 +1588,18 @@ function title_setup()
 		
 		color(1)
 		print("c"..smallcaps("asey"),108,117)
---		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
 		print("l"..smallcaps("abrack"),100,122)
 
 		print(smallcaps("v").."."..version,1,122)
 		yield()
 	end
-	dset(2,difficulty)
 	sfx(37,-2)
 	seconds,minutes=0,0
 	
 	-- play tau 0 if noob or on practice difficulty
-	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
+	if dget(3)==0 then lvl=0 else lvl=1 end
 
 	makelvl()
-	mulligans=mulldiff[difficulty]
 	extralives=mulligans
 	state="wipe"
 	wipe=cocreate(wipe_anim)	
