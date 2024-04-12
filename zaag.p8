@@ -5,7 +5,7 @@ __lua__
 -- casey labrack
 
 --todo:
--- boss hit palette bug?
+-- palette bug?
 -- intro
 
 --😐:
@@ -226,7 +226,10 @@ for f in all(fs) do
 			end
 		end
 	end
-	if f.tick%f.br==0 and #f<f.max then --bud
+	--bud
+	if f.tick%f.br==0 
+--	and #f<f.max 
+	then 
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
 			local k,ang,colliding,i,l={},0,true,0,{}
@@ -236,27 +239,32 @@ for f in all(fs) do
 				ang=rnd(1)
 				k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
 				i2=0
-				while distt(k,inner)>63 and i2<100 do
+				--try spawning in bounds
+				while (distt(k,inner)>63 
+				or distt(k,inner)<24)
+				and i2<100 do
 					i2+=1
 					ang=rnd(1)
 					k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
 				end
+				--try spawning away from others
 				k.r=8
 				colliding=false
-				for m in all(f) do
-					if m~=l then
-						if touching(m,k) then
-							colliding=true
-							break
+				for z in all(fs) do
+					for m in all(z) do
+						if m~=l then
+							if touching(m,k) then
+								colliding=true
+								goto floracontinue
+							end
 						end
 					end
 				end
+				::floracontinue::
 			end
-			if i<100 then
---				if distt(k,inner)<62 then
+			if i<100 and i2<100 then
 					k.r=2	k.growcount=0 k.hit=-100
 					add(f,k)
---				end
 			end
 		end
 	end
@@ -596,6 +604,15 @@ for h in all(hs) do
 	fillp()
 end
 
+--flora green
+for f in all(fs) do
+	for l in all(f) do
+		fillp(ˇ)
+		circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
+		fillp()
+	end
+end
+
 --clip game artwork (safezones) to circle
 circfill(64,64,outer_r,0 | 0x1800)
 
@@ -620,13 +637,8 @@ for l in all(lz) do
 	end
 end
 
---flowers
+--flora buds
 for f in all(fs) do
-	for l in all(f) do
-		fillp(ˇ)
-		circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
-		fillp()
-	end
 	for l in all(f) do
 		spr(20,l.x-4,l.y-4)
 	end
@@ -820,6 +832,7 @@ function makelvl()
 	end
 	--remove anti-safezone marker
 	lvls.nosafezone=nil
+	--special levels override
 	if lvl==0 then lvls={flowers=1} end
 	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
 end
@@ -872,9 +885,8 @@ function spawn()
 				if #lz==num then break end
 			end
 			if unit=="bomb" then
---				h:spawn()
-				h=spawnbomb()
-				h:spawn()
+				h=newbomb()
+				h:spawn()				
 				add(hs,h)
 				sfx(9)
 				if #hs==num then break end
@@ -882,14 +894,37 @@ function spawn()
 			if unit=="flowers" then
 				local f={}
 				f.tick,f.max=flr(rnd(10)),4
-				f.growgoal=60 --grow rate
+				f.growgoal=45 --grow rate
 				f.br=(150+flr(rnd(100)))*2 --bud rate
-				local r,d={},12+rnd(63-24)
-				local a=aim_away(.25,.25)
-				r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+				local r={}
 				r.growcount=-rnd(60) r.hit=-100
-				add(f,r)
-				add(fs,f)
+				c=0
+				local invalid=true
+				while invalid and c<100 do
+					c+=1
+					invalid=false
+					--spawn far enough from center
+					--so that it can grow to full size
+					--and spawn within bounds obvsly
+					local d=18+rnd(63-18)
+					--away from player
+					local a=aim_away(.25,.25)
+					r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+					--don't overlap other flora
+					for florasystem in all(fs) do
+						for flora in all(florasystem) do
+							if touching(flora,r) then
+								invalid=true
+								goto continuefloraspawn
+							end
+						end
+					end
+					::continuefloraspawn::
+				end
+				if c!=100 then
+					add(f,r)
+					add(fs,f)					
+				end 
 				sfx(8)
 				if #fs==num then break end
 			end
@@ -1060,11 +1095,10 @@ function gamewin_anim()
 		
 		cprint("every tau immaculate!", 64,30,7)
 		cprint("pilot notes:",64,54,7)
-		cprint("\""..smallcaps(msg[difficulty]).."\"",64,62,6)
+		cprint("\""..smallcaps(rnd(msg)).."\"",64,62,6)
 
 		cprint("time: "..final_time,64,84,13)
-		cprint(diffmsg[difficulty],64,90,13)
-
+	
 		yield()
 	end	
 	ps[1].enabled,ps[2].enabled=false,false
@@ -1198,14 +1232,46 @@ end
 --misc
 
 --homing bomb
-function spawnbomb() 
+function newbomb() 
 	return setmetatable({
 			r=3,dx=0,dy=0,t=.03,sight=48,
 			frametick=0,state="idle",muted=false,
 			spawn=function(_ENV)
-				local a,d=aim_away(.25,.6),rnd(64-24)+12
-				x,y,dx,dy,frametick=
-				64+cos(a)*d,64+sin(a)*d,0,0,0
+				
+				--spawn out of range of player 
+				--try to space apart from other bombs
+				local invalid=true
+				local c=0
+				while invalid and c<100 do
+					invalid=false
+					c+=1
+--					if c==100 then stop("couldn't spawn bomb") end
+					local a=rnd()
+					local d=rndr(18,52)
+					x,y=64+cos(a)*d,64+sin(a)*d
+
+					--definitely away from player
+					local playerinrange=true
+					while playerinrange do
+						playerinrange=false
+						local a=rnd()
+						local d=rndr(18,52)
+						x,y=64+cos(a)*d,64+sin(a)*d
+						if dist(ps[1].x,ps[1].y,x,y)<sight then
+							playerinrange=true					
+						end
+					end
+					
+					--keep some range from others if you can
+					for h in all(hs) do
+						if dist(h.x,h.y,x,y)<20 then
+							invalid=true
+							goto hspawncontinue
+						end
+					end					
+					::hspawncontinue::
+				end
+				dx,dy,frametick=0,0,0
 			end,
 			
 			update=function(_ENV)
@@ -1529,7 +1595,7 @@ function title_setup()
 	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
-	h=spawnbomb()
+	h=newbomb()
 	h.muted=true
 	h:spawn()
 	add(hs,h)
@@ -1556,10 +1622,7 @@ function title_setup()
 	end
 	yield()
 	
-	local haspressed,c=false,0
-	
-	while c<30 or not ((btn(❎) or btn(🅾️)) and haspressed) do
-		c+=1
+	while true do	
 --give the bomb something to chase
 		if rnd()>.95 then 
 			ps[1].x,ps[1].y=rnd(128),rnd(128)
@@ -1570,17 +1633,16 @@ function title_setup()
 		sspr(69,8,51,40,39,18)
 		pal()
 
-		--difficulty choose
 		cprint("press ❎",64,114,1)
-		if btnp()~=0 then
---			haspressed,c=true,0
-			break
-		end
 		
 		--p2 controller button press detect
 		--for p2 join
 		if btnp()>255 then 
 			ps[2].playing=not ps[2].playing
+		end
+		
+		if btnp(❎,0) or btnp(🅾️,0) then
+			break
 		end
 		
 		print("2p join"..(ps[2].playing and "!" or "?"),
