@@ -148,7 +148,7 @@ function _init()
 --	_draw=_maindraw
 --	tick=0
 --	title=cocreate(title_setup)
-	_update60=nil
+	_update60=function () end
 --	_draw=introdraw
 	_draw=introdraw2
 
@@ -1276,17 +1276,17 @@ function slides()
 		local hidepal={[14]=0,[11]=0,[10]=0,[8]=0,[6]=0,[9]=0}
 
 		--ship reveal
-		if t>60 then
+		if t>120 then
 			hidepal[10]=7
 			text="your ship"
 		end
 		--zoids reveal
-		if t>120 then
+		if t>240 then
 			hidepal[9]=nil hidepal[11]=nil
 			text="your enemies"
 		end
 		--defenses reveal
-		if t>180 then
+		if t>360 then
 			hidepal[6]=nil hidepal[8]=nil hidepal[14]=nil
 			text="the defenses"
 		end
