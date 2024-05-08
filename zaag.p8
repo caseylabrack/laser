@@ -5,9 +5,8 @@ __lua__
 -- casey labrack
 
 --todo:
--- the hit palette bug
--- boss restart palette bug?
--- sound for boss charging attack
+-- palette bug?
+-- intro
 
 --😐:
 -- unique death animations
@@ -15,36 +14,26 @@ __lua__
 -- music?
 -- toggle enable flip? 'enable ship flip'
 -- option: skip tau 0
--- intro: detailed ship zooming through taus (tunnel)
--- you have only your blaster--and spares
+-- do away with difficulty?
+-- mulligans? (if you die within one sec)
+-- cutscene fuzzy dice
+-- gameover progress of enemy sprites
+--  with boss at the end of line
+-- "return of zaag"? zaag returns
+-- names like bacteria
+-- new gameover screen
+-- site? lance? terminology
+-- intro: a skill based video skill program
+--  for one or two players
 
 version=53
 _g=_ENV
-
-
-dmg={ 
-	{roid=2,flower=2,bomb=120,boss=4},--easy
-	{roid=1.5,flower=1.5,bomb=90,boss=3},--normal
-	{roid=1,flower=1,bomb=60,boss=2},--hard
-}
 laserspeeds={.0025,.002,.0015}
---laserspeeds={.005,.004,.003}
---players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets
-ps,lz,zs,as,a2,fs,rs,bs={},{},{},{},{},{},{},{}
+--players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
+ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
-lvl,mulligans=1,1
+mulligans=2
 extralives=mulligans
-mulldiff={2,1,0} --how many mulligans for each difficulty
-mulmsg={ --titlescreen mulligan description
-"(2 spares, 2x pwr)",
-"(1 spare, 1.5x pwr)",
-"(0 spares, 1x pwr)",
-}
-diffmsg={--titlescreen difficulty description
-"difficulty: practice",
-"difficulty: challenge",
-"difficulty: prestige",
-}
 tick,state=0,"title"
 cp=dp--current pallete
 sleep,shake=0,0
@@ -89,7 +78,6 @@ tips={
 	{"remember to take","15 minute breaks!"},
 	{"zaag is a fun game"},
 	{"very close range shots","= very fast rate of fire"},
---	{"quick flip (⬇️) is","faster than doing a 180"},
 	{"pause screen has some","additional options"},
 	{"real winners","say no to drugs"},
 	{"blaster has warm up,","tele is charged at start"},
@@ -103,7 +91,7 @@ function _init()
 	poke(0x5f34,0x2)--inverse fill
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
-	fire_btn  = (not swapped) and ❎ or 🅾️ 
+	fire_btn  = (not swapped) and ❎ or 🅾️
 	tele_btn = (not swapped) and 🅾️ or ❎
 	deathgifs=dget(1)==1
 	difficulty=dget(2)
@@ -111,7 +99,7 @@ function _init()
 	difficulty=difficulty==0 and 1 or difficulty
 	initplayers()
 
-	-- bullets init	
+	-- bullets init
 	for i=1,2 do
 		add(bs,
 		setmetatable({
@@ -121,14 +109,14 @@ function _init()
 				for i=1,10 do
 					local ps={}
 					ps.x,ps.y=x,y
-					local d,ang=rnd(4),rndr(-.2,.2)
+					local d,ang=rnd(2),rndr(-.2,.2)
 					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(12)
 					add(parts,ps)
 				end
-				enabled=false 
-				sfx(20,-2)
+				enabled=false
+				sfx(44,-2)
 			end,
-			
+
 			doparticles=function(_ENV)
 				for bp in all(parts) do
 					bp.t-=1
@@ -139,7 +127,7 @@ function _init()
 					end
 				end
 			end,
-			
+
 			render=function(_ENV)
 --				if not enabled then return end
 				if enabled then
@@ -151,11 +139,11 @@ function _init()
 			end,
 		},{__index=_ENV}))
 	end
-	
-	
+
+
 	introco=cocreate(slides)
 	coresume(introco)
-	
+
 --	_update60=_mainupdate
 --	_draw=_maindraw
 --	tick=0
@@ -171,13 +159,13 @@ function _init()
 end
 
 --function btns_toggle()
---	if fire_btn==❎ then	
+--	if fire_btn==❎ then
 --		fire_btn=🅾️ tele_btn=❎
 --		dset(0,1)
---	else	
+--	else
 --		fire_btn=❎ tele_btn=🅾️
 --		dset(0,0)
---	end 
+--	end
 --end
 
 --function dethgiftoggle()
@@ -222,14 +210,14 @@ if sleep>0 then
 end
 
 charge+=1
-gun=min(gun+1,gunfull)
+gun+=1
 boss:update()
 
 -- play rocket noise (only once) if either is rocketing
 local thrust=ps[1].thrusting or ps[2].thrusting
 if pthrusting then
 	if not thrust then sfx(2,-2) end
-else	
+else
 	if thrust then sfx(2) end
 end
 pthrusting=thrust
@@ -249,7 +237,10 @@ for f in all(fs) do
 			end
 		end
 	end
-	if f.tick%f.br==0 and #f<f.max then --bud
+	--bud
+	if f.tick%f.br==0
+--	and #f<f.max
+	then
 		local couldbuds=filter(function(x) return x.r>=12 end, f)
 		if #couldbuds>0 then
 			local k,ang,colliding,i,l={},0,true,0,{}
@@ -259,27 +250,32 @@ for f in all(fs) do
 				ang=rnd(1)
 				k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
 				i2=0
-				while distt(k,inner)>63 and i2<100 do
+				--try spawning in bounds
+				while (distt(k,inner)>63
+				or distt(k,inner)<24)
+				and i2<100 do
 					i2+=1
 					ang=rnd(1)
 					k.x,k.y=l.x+cos(ang)*l.r,l.y+sin(ang)*l.r
 				end
+				--try spawning away from others
 				k.r=8
 				colliding=false
-				for m in all(f) do
-					if m~=l then
-						if touching(m,k) then
-							colliding=true
-							break
+				for z in all(fs) do
+					for m in all(z) do
+						if m~=l then
+							if touching(m,k) then
+								colliding=true
+								goto floracontinue
+							end
 						end
 					end
 				end
+				::floracontinue::
 			end
-			if i<100 then
---				if distt(k,inner)<62 then
+			if i<100 and i2<100 then
 					k.r=2	k.growcount=0 k.hit=-100
 					add(f,k)
---				end
 			end
 		end
 	end
@@ -289,27 +285,27 @@ end
 for l in all(lz) do
 	l.a-= l.speed
 	l.x,l.y=64+cos(l.a)*63,64+sin(l.a)*63
-	
+
 	if #zs>0 and zs[1].state~="moving" then
 		local s=zs[1] --safezone
 		local atosafe=atan2(s.x-64,s.y-64)
 		local diff=sad(atosafe,l.a)
-		
+
 		-- hit safezone instead
-		if abs(diff)<30 then 
+		if abs(diff)<30 then
 			circ(s.x,s.y,s.r,10)
-			circfill(s.x,s.y,s.r,10)			
+			circfill(s.x,s.y,s.r,10)
 
 			local inzone=true
 			local dx,dy=cos(l.a),sin(l.a)
-			
+
 			while inzone do
 				l.x-=dx l.y-=dy
 				inzone=pget(l.x,l.y)==10
-			end						
+			end
 		end
 	end
-	
+
 	--do laser particles
 	for z in all(l.parts) do
 		z.x+=z.dx z.y+=z.dy
@@ -319,7 +315,7 @@ for l in all(lz) do
 		end
 	end
 
-	--create laser particles	
+	--create laser particles
 	local a=l.a+.5+rndr(-.25,.25)
 	add(l.parts,{
 		x=l.x,y=l.y,
@@ -336,7 +332,7 @@ for z in all(zs) do
 		end
 	elseif z.state=="shrinking" then
 		z.t-=.125
-		if z.t<2 then 
+		if z.t<2 then
 			z.state,z.start,z.dist,z.mstart="moving",z.a,rnd(),tick
 		end
 	elseif z.state=="moving" then
@@ -353,42 +349,46 @@ for z in all(zs) do
 end
 
 --homing bomb move
-h:update()
+for h in all(hs) do
+	h:update()
+end
 
 for p in all(ps) do
 
 	p:update()
-	
+
 	if not p.playing then break end
 
 	local ang=atan2(p.x-64,p.y-64)
-	
+
 -- player vs outside wall
 	if dist(p.x,p.y,64,64)>63 then
 		p.x,p.y=64+cos(ang)*63,64+sin(ang)*63
 	end
-	
+
 -- player vs inside wall
 	if touching(inner,p) then
 		p.x,p.y=64+cos(ang)*8,64+sin(ang)*8
 	end
-	
+
 	if p.enabled then
 		-- player vs. obstacles
 		for v in all(rs) do
 			if (touching(p,v)) died(p,v)
 		end
-	
+
 		--player vs. homing bombs
-		if h.enabled and touching(p,h) then 
-			died(p,h)
+		for h in all(hs) do
+			if touching(p,h) then
+				died(p,h)
+			end
 		end
-		
+
 		--player vs. boss
 		if boss.enabled and touching(p,boss.floor) then
 				died(p,boss)
 		end
-		
+
 		--laser/player collision
 		local d=dist(p.x,p.y,64,64)
 		local vulnerable=true
@@ -443,9 +443,7 @@ for b in all(bs) do
 				for l in all(f) do --leaves
 					if touching(b,l) then
 						b:splash()
-	--					sfx(24)
---						sfx(21)
-						l.r-=dmg[difficulty].flower
+						l.r-=1.5
 						l.growcount=0
 						l.hit=tick
 						if l.r<3 then
@@ -464,17 +462,17 @@ for b in all(bs) do
 			for v in all(rs) do --roids
 				if touching(b,v) then
 					b:splash()
---					sfx(21)					
+--					sfx(21)
 					local oldr=v.r
-					v.r-=dmg[difficulty].roid
+					v.r-=1.5
 					v.hit=tick
 --					shake+=5
-					if v.r<3 then	
+					if v.r<3 then
 						shake+=5
 						local z=cocreate(rsplode)
 						coresume(z,v.x,v.y,oldr,v.dx,v.dy)
 						add(a2,z)
-						del(rs,v) 
+						del(rs,v)
 						sfx(43)
 						sleep+=4
 					else
@@ -491,21 +489,21 @@ for b in all(bs) do
 					goto donebullet
 				end
 			end
-			if h.enabled and touching(h,b) then
-				sfx(42)
-				b:splash()
-				h.stunned=true
-				h.timer=dmg[difficulty].bomb
-				h.dx+=b.dx/4	h.dy+=b.dy/4
-				goto donebullet
+			for h in all(hs) do
+				if touching(h,b) then
+					sfx(42)
+					b:splash()
+					h.dx+=b.dx/2	h.dy+=b.dy/2
+					goto donebullet
+				end
 			end
 			if boss.enabled and touching(boss,b) then
-				boss.hp-=dmg[difficulty].boss
+				boss.hp-=2
 				boss.lasthit=tick
 				b:splash()
 				sfx(42)
 				goto donebullet
-			end			
+			end
 			if touching(inner,b) or distt(inner,b)>63 then
 				b:splash()
 				goto donebullet
@@ -526,8 +524,10 @@ if ps[1].enabled or ps[2].enabled then
 		sfx(2,-2)
 		if lvl==2 then dset(3,1) end
 		lvl+=1
+		makelvl()
 		wipe=cocreate(wipe_anim)
 		state="wipe"
+--		music(-1,100)
 	end
 end
 
@@ -553,7 +553,7 @@ function died(player,cause)
 		player.thrusting=false
 		player:death(cause)
 	end
-	
+
 	if not ps[1].enabled and not ps[2].enabled then
 --		log="lose"
 		extralives-=1
@@ -605,25 +605,38 @@ for z in all(zs) do
 	end
 end
 
---clip game artwork (safezones) to circle
-circfill(64,64,outer_r,0 | 0x1800)
-
 --do animations
 for z in all(a2) do
 	if costatus(z)!="dead" then assert(coresume(z))
 	else del(a2,z) end
 end
 
---safezone bot
-for z in all(zs) do
-	spr(5,z.x-4,z.y-4)
+--homing bombs radius
+for h in all(hs) do
+	fillp(…)
+	circ(h.x,h.y,h.sight,14)
+	fillp()
+end
+
+--flora green
+for f in all(fs) do
+	for l in all(f) do
+		fillp(ˇ)
+		circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
+		fillp()
+	end
+end
+
+--clip game artwork (safezones) to circle
+circfill(64,64,outer_r,0 | 0x1800)
+
+--homing bombs
+for h in all(hs) do
+	h:render()
 end
 
 pal()
---if outer.enabled then
-	circ(64,64,outer_r,6)
---	circle(outer.x,outer.y,outer.r,6)
---end
+circ(64,64,outer_r,6)
 pal(cp)
 
 --laser
@@ -638,13 +651,8 @@ for l in all(lz) do
 	end
 end
 
---flowers
+--flora buds
 for f in all(fs) do
-	for l in all(f) do
-		fillp(ˇ)
-		circfill(l.x,l.y,l.r,tick-l.hit>30 and 11 or 3)
-		fillp()
-	end
 	for l in all(f) do
 		spr(20,l.x-4,l.y-4)
 	end
@@ -660,11 +668,22 @@ end
 --emitter
 if state~="dead" and inner.enabled then
 	circfill(64,64,inner.r,0)
-	circ(64,64,inner.r,6)
+--	circ(64,64,inner.r,6)
+	circle(64,64,inner.r,6)
 end
 
---homing bombs
-h:render()
+--boss
+boss:render()
+
+--bullet
+for b in all(bs) do
+	b:render()
+end
+
+--safezone bot
+for z in all(zs) do
+	spr(5,z.x-4,z.y-4)
+end
 
 --player
 for p in all(ps) do
@@ -683,14 +702,6 @@ for v in all(rs) do
 													v.y+sin(a)*v.r,
 													dist(0,0,v.dx,v.dy)*3
 	line(x,y,x+cos(a)*m,y+sin(a)*m)
-end
-
---boss
-boss:render()
-
---bullet
-for b in all(bs) do
-	b:render()
 end
 
 if wipe and costatus(wipe)~="dead" then coresume(wipe) end
@@ -715,7 +726,7 @@ if state=="running" then
 	rect(x,y,x2,y2,f)
 	clip()
 	print("blaster",x+2,y+2,f)
-	
+
  --hop countdown
 	local f=charge<fullcharge and 3 or 11
 	if hopfail then
@@ -792,13 +803,10 @@ lvls={
 function wipe_anim()
 	yield()
 	sfx(32)
---	outer.enabled=false	
 	local start=tick
 	while tick-start<60 do
 		if tick-start==30 then ps[1].enabled=false end
 		local pct=easeinexpo((tick-start)/60)
---		local pct=(tick-start)/30
---		pct=easeinexpo(pct)
 		local r=inner.r+(63-inner.r)*pct
 		circfill(64,64,r,0)
 		circ(64,64,r,6)
@@ -812,9 +820,55 @@ function wipe_anim()
 	add(as,cocreate(spawn))
 end
 
+--spawn prices
+sprice={
+	roids=2,flowers=1,lasers=3,
+	safezone=-1,nosafezone=0,
+	bomb=2,
+}
+
+function makelvl()
+	budget=lvl+2
+	lvls={roids=3}
+
+	while budget>0 do
+
+		local canspawn={}
+
+		add(canspawn,"roids")
+		if budget>=sprice["flowers"] then
+			add(canspawn,"flowers")
+		end
+		if budget>=sprice["bomb"] then
+			add(canspawn, "bomb")
+		end
+		if budget>=sprice["lasers"] then
+			if lvls.lasers==nil or lvls.lasers<2 then
+				add(canspawn,"lasers")
+				--double the weight of lasers until there's one
+				if lvls.lasers==nil then
+					add(canspawn,"lasers")
+				end
+			end
+		end
+		if lvls.lasers~=nil and lvls.nosafezone==nil then
+			add(canspawn,"safezone")
+			add(canspawn,"nosafezone")
+		end
+
+		picked=rnd(canspawn)
+		budget-=sprice[picked]
+		lvls[picked]=lvls[picked] and lvls[picked]+1 or 1
+	end
+	--remove anti-safezone marker
+	lvls.nosafezone=nil
+	--special levels override
+	if lvl==0 then lvls={flowers=1} end
+	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
+end
+
 function spawn()
-	tick=0
-	state,i,c="setup",20,22
+	state,i,c="setup",20,42
 	for p in all(ps) do
 		p:spawn()
 	end
@@ -826,7 +880,8 @@ function spawn()
 	while c>0 do c-=1 yield() end
 	inner.enabled=true
 	--spawn each unit type in random order
-	for unit,num in pairs(lvls[lvl]) do
+	for unit,num in pairs(lvls) do
+
 		c=i --countdown spawn interval
 		while true do
 			c-=1
@@ -860,21 +915,46 @@ function spawn()
 				if #lz==num then break end
 			end
 			if unit=="bomb" then
+				h=newbomb()
 				h:spawn()
+				add(hs,h)
 				sfx(9)
-				break
+				if #hs==num then break end
 			end
 			if unit=="flowers" then
 				local f={}
 				f.tick,f.max=flr(rnd(10)),4
-				f.growgoal=60 --grow rate
+				f.growgoal=45 --grow rate
 				f.br=(150+flr(rnd(100)))*2 --bud rate
-				local r,d={},12+rnd(63-24)
-				local a=aim_away(.25,.25)
-				r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+				local r={}
 				r.growcount=-rnd(60) r.hit=-100
-				add(f,r)
-				add(fs,f)
+				c=0
+				local invalid=true
+				while invalid and c<100 do
+					c+=1
+					invalid=false
+					--spawn far enough from center
+					--so that it can grow to full size
+					--and spawn within bounds obvsly
+					local d=18+rnd(63-18)
+					--away from player
+					local a=aim_away(.25,.25)
+					r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+					--don't overlap other flora
+					for florasystem in all(fs) do
+						for flora in all(florasystem) do
+							if touching(flora,r) then
+								invalid=true
+								goto continuefloraspawn
+							end
+						end
+					end
+					::continuefloraspawn::
+				end
+				if c!=100 then
+					add(f,r)
+					add(fs,f)
+				end
 				sfx(8)
 				if #fs==num then break end
 			end
@@ -893,9 +973,11 @@ function spawn()
 	while c>0 do c-=1 yield() end
 	state="running"
 	extcmd("rec")
+	music(32,2000)
 end
 
 function death(delay)
+	music(-1,100)
 	yield()
 	while delay>0 do
 		delay-=1
@@ -932,7 +1014,7 @@ function death(delay)
 	if extralives<0 then
 		del(a2,gameoveranimation)
 		lvl=1
-		extralives=mulligans
+		extralives=2
 		state="title"
 		title=cocreate(title_setup)
 	else
@@ -945,59 +1027,12 @@ end
 function gameover()
 	local start=tick
 	local c=0
-	local tw=60--trackwidth
-	local tt=5 --ticks total
-	local ts=tw/4--tick spacing
-	local tb=64-tw/2 --ticks begin
-	local yt=68 --tracks y pos
-	local mascots={
-		[1]=function(x,y) --roid
-			circ(x,y,3,9)
-			spr(2,x-4,y-4)
-		end,
-		[2]=function(x,y) --flower
-			fillp(ˇ)
-			circfill(x,y,4,11)
-			fillp()
-			spr(20,x-4,y-4)
-		end,
-		[3]=function(x,y) --bomb
-			spr(21,x-4,y-4)
-		end,
-		[4]=function(x,y) --double
-			line(x-3,y-3,x+3,y+3,8)
-			circfill(x,y,1,0)
-			circ(x,y,1,6)
-		end,
-		[5]=function(x,y) --boss
-			circ(x,y,4,14)
-			circ(x,y,1,8)
-		end
-	}
+	local yt=54 --tracks y pos
 	local tip=rnd(tips)
 	while true do
 		c+=1
+		sspr(22,48,107,16,10,46)
 
-		sspr(21,40,106,16,12,46)--gameover text
-
-		local xl=tb
-		for i=1,5 do --draw 5 ticks
-			line(xl,yt,xl,yt+2,7)
-			if lvl < (i-1)*3 then
-				for j=0,15 do
-					pal(j,1)
-				end
-			end
-			mascots[i](xl,yt+8)
-			pal(cp)
-			xl+=ts
-		end
-
-		if c>60 then -- progress line
-			local pct=min(1,(c-60)/20)
-			line(tb,yt+1,tb+tw*pct*(lvl/#lvls),yt+1,8)
-		end
-		
 		local ystart=yt+18
 		for i=1,#tip do
 			local msg=tip[i]
@@ -1007,7 +1042,7 @@ function gameover()
 		end
 		yield()
 	end
-	extralives=mulligans
+--	extralives=mullig
 end
 
 function deathmsg_anim()
@@ -1026,7 +1061,7 @@ function deathmsg_anim()
 					spr(22,i*6-6,10)
 				end
 			else
-				spr(22,i*6-6,10)			
+				spr(22,i*6-6,10)
 			end
 		end
 		yield()
@@ -1037,35 +1072,35 @@ function gamewin_anim()
 --stop timer, convert to formatted string
 	local final_time=""..minutes..":"..(seconds<10 and "0"..seconds or seconds)
 
-	local i=90	
+	local i=90
 	for v in all(rs) do --roids
 		local z=cocreate(rsplode)
 		coresume(z,v.x,v.y,v.r,v.dx,v.dy)
 		add(a2,z)
-		del(rs,v) 
+		del(rs,v)
 	end
-	
+
 	for b in all(boss.bulges) do
 		local z=cocreate(rsplode)
 		coresume(z,b.x,b.y,b.r,0,0)
 		add(a2,z)
 		del(boss.bulges,b)
 	end
-	
+
 	while i>0 do -- delay for boss outro
 		i-=1
 
-		local pct=1-i/180	
-		boss.detht=pct	
+		local pct=1-i/180
+		boss.detht=pct
 		local dx,dy=64-boss.steadyx,64-boss.steadyy
 		dx*=.1
 		dy*=.1
-		
+
 		boss.steadyx+=dx
 		boss.steadyy+=dy
-		
+
 		boss.x,boss.y=boss.steadyx+rnd()*3*(1-pct),boss.steadyy+rnd()*3*(1-pct)
-		
+
 		yield()
 	end
 	i=120
@@ -1078,7 +1113,7 @@ function gamewin_anim()
 	clearlevel()
 	inner.enabled=false
 	ps[1].enabled,ps[2].enabled=false,false
-	
+
 --	local msg=rnd({"2 ez","gottem","booyah."})
 	local msg=split"gottem,booyah,2 ez."
 	i,cp=180,dp
@@ -1089,27 +1124,27 @@ function gamewin_anim()
 		i-=1
 
 --		local ypos=62
-		
+
 		cprint("every tau immaculate!", 64,30,7)
 		cprint("pilot notes:",64,54,7)
-		cprint("\""..smallcaps(msg[difficulty]).."\"",64,62,6)
+		cprint("\""..smallcaps(rnd(msg)).."\"",64,62,6)
 
 		cprint("time: "..final_time,64,84,13)
-		cprint(diffmsg[difficulty],64,90,13)
 
 		yield()
-	end	
+	end
 	ps[1].enabled,ps[2].enabled=false,false
 	state="title"
 	title=cocreate(title_setup)
 end
 
-function clearlevel()		
-		lz,zs,h.enabled,rs,fs={},{},false,{},{}
+function clearlevel()
+		lz,zs,hs,rs,fs={},{},{},{},{}
+--		lz,zs,h.enabled,rs,fs={},{},false,{},{}
 		for b in all(bs) do
 			b.enabled=false b.parts={}
-		end 
-		boss.enabled=false		
+		end
+		boss.enabled=false
 end
 -->8
 --utils
@@ -1214,7 +1249,7 @@ function circle(x,y,r,c)
 	  xo+=1
 	until xo>yo
 end
- 	
+
 --https://www.lexaloffle.com/bbs/?pid=88836#p
 function smallcaps(s)
   local t=""
@@ -1241,21 +1276,21 @@ function slides()
 		local hidepal={[14]=0,[11]=0,[10]=0,[8]=0,[6]=0,[9]=0}
 
 		--ship reveal
-		if t>60 then 
+		if t>60 then
 			hidepal[10]=7
 			text="your ship"
 		end
 		--zoids reveal
-		if t>120 then 
-			hidepal[9]=nil hidepal[11]=nil 
+		if t>120 then
+			hidepal[9]=nil hidepal[11]=nil
 			text="your enemies"
 		end
 		--defenses reveal
-		if t>180 then 
-			hidepal[6]=nil hidepal[8]=nil hidepal[14]=nil 
+		if t>180 then
+			hidepal[6]=nil hidepal[8]=nil hidepal[14]=nil
 			text="the defenses"
 		end
-		
+
 		print(smallcaps("site: tau clusters"),1,40,13)
 		print(smallcaps("scale: 9um"),1,48,13)
 		pal(hidepal)
@@ -1271,7 +1306,7 @@ function slides()
 	title=cocreate(title_setup)
 end
 
-function introdraw2() 
+function introdraw2()
 	if costatus(introco)!="dead" then
 		assert(coresume(introco))
 	else
@@ -1280,61 +1315,88 @@ function introdraw2()
 end
 
 --homing bomb
-h=setmetatable({
-			r=3,dx=0,dy=0,t=.02,
-			enabled=false,timer=0,
-			frametick=0,
+function newbomb()
+	return setmetatable({
+			r=3,dx=0,dy=0,t=.03,sight=48,
+			frametick=0,state="idle",muted=false,
 			spawn=function(_ENV)
-				local a,d=aim_away(.25,.6),rnd(64-24)+12
-				x,y,dx,dy,enabled,
-				timer,frametick,stunnned=
-				64+cos(a)*d,64+sin(a)*d,0,0,
-				true,0,0,false
+
+				--spawn out of range of player
+				--try to space apart from other bombs
+				local invalid=true
+				local c=0
+				while invalid and c<100 do
+					invalid=false
+					c+=1
+--					if c==100 then stop("couldn't spawn bomb") end
+					local a=rnd()
+					local d=rndr(18,52)
+					x,y=64+cos(a)*d,64+sin(a)*d
+
+					--definitely away from player
+					local playerinrange=true
+					while playerinrange do
+						playerinrange=false
+						local a=rnd()
+						local d=rndr(18,52)
+						x,y=64+cos(a)*d,64+sin(a)*d
+						if dist(ps[1].x,ps[1].y,x,y)<sight then
+							playerinrange=true
+						end
+					end
+
+					--keep some range from others if you can
+					for h in all(hs) do
+						if dist(h.x,h.y,x,y)<20 then
+							invalid=true
+							goto hspawncontinue
+						end
+					end
+					::hspawncontinue::
+				end
+				dx,dy,frametick=0,0,0
 			end,
-			
+
 			update=function(_ENV)
-				if enabled then
-					if stunned then
-						timer-=1
-						if timer<0 then stunned=false end
-					else
-						local target=closestplayer(h)
-						local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
-						dx+=cos(a)*t dy+=sin(a)*t
-						frametick+=1
-					end
-					dx*=.97 dy*=.97
-					x+=dx	y+=dy
-					local a2=atan2(x-64,y-64)
-					if dist(x,y,64,64)<8 then
-						x,y=64+cos(a2)*8,64+sin(a2)*8
-					end
-					if dist(x,y,64,64)>63 then
-						x,y=64+cos(a2)*63,64+sin(a2)*63
-					end
+				local target=closestplayer(h)
+				local d=dist(x,y,target.x,target.y)
+				if d<sight then
+					if state~="chase" and not muted then sfx(9) end
+					state="chase"
+					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+					dx+=cos(a)*t dy+=sin(a)*t
+					frametick+=1
+				else
+					state="idle"
+				end
+--				dx*=.99 dy*=.99
+				dx*=.97 dy*=.97
+				x+=dx	y+=dy
+				local a2=atan2(x-64,y-64)
+				if dist(x,y,64,64)<8 then
+					x,y=64+cos(a2)*8,64+sin(a2)*8
+				end
+				if dist(x,y,64,64)>63 then
+					x,y=64+cos(a2)*63,64+sin(a2)*63
 				end
 			end,
-			
+
 			render=function(_ENV)
-				if enabled then
-					palt(10,true)
-					palt(0,false)
-					local _x,_y=0,0
-					if stunned then
-						spr(23,x-4,y-4)
-						_x,_y=rnd(),rnd()
-					else
-						spr((flr(frametick%16)/4)+16,x-4,y-4)
-						_x=dx<0 and 1 or 0
-						_y=dy<0 and 1 or 0
---						pset(x-(dx<0 and 1 or 0),y-(dy<0 and 1 or 0),8)
-					end
+				palt(10,true)
+				palt(0,false)
+				local _x,_y=0,0
+				if state~="chase" then
+					spr((tick%120)/60+3,x-4,y-4)
+				else
+					spr(frametick%16/4+16,x-4,y-4)
+					_x=dx<0 and 1 or 0
+					_y=dy<0 and 1 or 0
 					pset(x-_x,y-_y,8)
-					palt()
 				end
+				palt()
 			end,
 		},{__index=_ENV})
-
+end
 
 --palettes
 dp={ --default
@@ -1377,7 +1439,7 @@ function rsplode(x,y,r,dx,dy)
 		c+=1
 		for i=i,12 do
 			pset(x+rnd(r),y+rnd(r),4)
-		end	
+		end
 		x+=dx y+=dy
 		yield()
 	end
@@ -1393,43 +1455,29 @@ function initplayers()
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,dr=0,
 			a=.75,t=.1,rt=.00375,r=2,
-			hop=25,
+			hop=30,
 			enabled=false,thrusting=false,
---			gun=0,gunfull=120,gunfail=false,gunfailtick=0,
---			flipready=10,fliplast=0,
 			deathlines={},deathpnts={},
 			spawnticks=0,
-			
+
 			update=function(_ENV)
 				if not enabled then return end
---				gun=min(gun+1,gunfull)
-				if btn(➡️,id) then 
---					a-=rt
-					dr-=rt 
+				if btn(➡️,id) then
+					dr-=rt
 				end
-				if btn(⬅️,id) then 
---					a+=rt 
+				if btn(⬅️,id) then
 					dr+=rt
 				end
---				if btn(⬇️,id) then
---					if tick-fliplast>flipready then
---					 a+=.5
---					 fliplast=tick
---				 end
---				end
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
 					if not thrusting then
 						thrusting=true
---						sfx(2)
 					end
 				else
---					sfx(2,-2)
 					thrusting=false
 				end
 				if btn(tele_btn,id) then
---				if btn(⬆️,id) then
 				 if _g.charge>_g.fullcharge then
 						local lines=coords(_ENV)
 						x+=cos(a)*hop
@@ -1438,7 +1486,6 @@ function initplayers()
 						_g.blink=cocreate(blink_anim)
 						coresume(_g.blink,lines)
 						_g.charge=0
---						if ps[2].playing==false then _g.sleep=8 end
 						sfx(22)
 					else
 						if tick-_g.hopfailtick>4 then
@@ -1449,14 +1496,12 @@ function initplayers()
 					end
 				end
 				if btn(fire_btn,id) and not bs[id+1].enabled then
-					if gun==gunfull then
+					if gun>=gunfull then
 						local b=bs[id+1]
 						b.enabled=true
 						b.x,b.y,b.a=x,y,a
 						b.dx,b.dy=cos(b.a)*b.speed,sin(b.a)*b.speed
 						sfx(44)
---						_g.shake+=2
---						sfx(25)
 					else
 						if tick-gunfailtick>4 then
 							_g.gunfail=true
@@ -1472,43 +1517,58 @@ function initplayers()
 				dy*=.92
 				dr*=.65
 			end,
-			
+
 			render=function(_ENV)
 				if not enabled then return end
-				
-				if spawnticks<8 then
+
+				--draw player
+				if spawnticks<16 then
 					local lines,fire,prow=coords(_ENV)
 					if thrusting then
 						circfill(fire.x,fire.y,1,rndr(8,11))
 					end
 					for l in all(lines) do
-						line(l.x1,l.y1,l.x2,l.y2,pcolor)
+						local c=pcolor
+						local t=fullcharge-charge
+						if t==11 then sfx(47) end
+						if mid(t,1,3)==t
+							or mid(t,5,7)==t
+							or mid(t,9,11)==t then
+							c=11
+						end
+
+						t=gunfull-gun
+						if t==11 then sfx(46) end
+						if mid(t,1,6)==t or mid(t,11,16)==t then
+								c=12
+						end
+						line(l.x1,l.y1,l.x2,l.y2,c)
 					end
 				end
-				
-				if spawnticks==8 and id==0 then 
+
+				if spawnticks==16 and id==0 then
 						sfx(18)--player spawn noise
 				end
-				
+
+				--entrance flash
 				if spawnticks>0 then
 					spawnticks-=1
 					color(pcolor)
 					local t=0
-					if spawnticks>8 then --expand
-						t=1-(spawnticks-8)/8
+					if spawnticks>16 then --expand
+						t=1-(spawnticks-16)/16
 					else --contract
-						t=spawnticks/8
+						t=spawnticks/16
 					end
 					t=easeoutexpo(t)
 					line(x,y,x+30*t,y)
-					line(x,y,x-30*t,y)
+					line(x-30*t,y)
 					line(x,y,x,y+30*t)
-					line(x,y,x,y-30*t)
+					line(x,y-30*t)
 					circfill(x,y,t*4)
 				end
---				circ(x,y,r,10)
 			end,
-			
+
 			coords=function(_ENV)
 				local m={x=x+cos(a)*2,y=y+sin(a)*2}
 				local prow=.05
@@ -1527,19 +1587,19 @@ function initplayers()
 				--prow
 				{x=m.x,y=m.y}
 			end,
-			
+
 			spawn=function(_ENV)
 				if not playing then return end
 --				a,dx,dy,gun=-.1,0,0,0
 				a,dx,dy=-.1,0,0
 				y=id==0 and 32 or 16
 				x=id==0 and 64 or 72
-				spawnticks=16
+				spawnticks=32
 				enabled=true
 			end,
-			
+
 			death=function(_ENV,cause)
-				local lines=coords(_ENV)				
+				local lines=coords(_ENV)
 				for l in all(lines) do
 					l.dx,l.dy=cause.dx or dx,cause.dy or dy
 					l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
@@ -1549,7 +1609,7 @@ function initplayers()
 					l.t=rndr(120,150)
 					add(deathlines,l)
 				end
-				
+
 				local s = 4 --dist spread
 				local ds=.1 --speed spread
 				for i=1,10 do
@@ -1564,7 +1624,7 @@ function initplayers()
 					add(deathpnts,z)
 				end
 			end,
-			
+
 			renderdeath=function(_ENV)
 				color(pcolor)
 				for l in all(deathlines) do
@@ -1606,7 +1666,7 @@ end
 function closestplayer(t)
 	if not ps[2].playing then return ps[1] end
 	if not ps[2].enabled then return ps[1] end
-	if not ps[1].enabled then return ps[2] end	
+	if not ps[1].enabled then return ps[2] end
 	return distt(t,ps[1])<distt(t,ps[2]) and ps[1] or ps[2]
 end
 -->8
@@ -1618,7 +1678,10 @@ function title_setup()
 	inner.enabled=true
 	local a=rnd()
 	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
+	h=newbomb()
+	h.muted=true
 	h:spawn()
+	add(hs,h)
 	for i=1,5 do
 		local f={}
 		f.tick,f.max=flr(rnd(100)),12
@@ -1641,13 +1704,10 @@ function title_setup()
 		add(rs,r)
 	end
 	yield()
-	
-	local haspressed,c=false,0
-	
-	while c<30 or not ((btn(❎) or btn(🅾️)) and haspressed) do
-		c+=1
+
+	while true do
 --give the bomb something to chase
-		if rnd()>.95 then 
+		if rnd()>.95 then
 			ps[1].x,ps[1].y=rnd(128),rnd(128)
 		end
 
@@ -1655,60 +1715,39 @@ function title_setup()
 		sspr(65,0,51,39,39,18)
 		pal()
 
-		--difficulty choose
-		if haspressed then
-			if btnp(⬅️) or btnp(⬇️) then
-				difficulty=mid(1,difficulty-1,3)
-			end			
-			if btnp(➡️) or btnp(⬆️) then
-				difficulty=mid(1,difficulty+1,3)
-			end
-			
-			local xoff,yoff,w,h=14,76,98,20
-			for x=1,w do
-				for y=1,h do
-					if pget(x+xoff,y+yoff)~=0 then
-						pset(x+xoff,y+yoff,1)
-					end
-				end
-			end
+		cprint("press ❎",64,114,1)
 
-			rect(xoff,yoff,xoff+w,yoff+h,1)
-			cprint(diffmsg[difficulty],64,80,7)
-			cprint(mulmsg[difficulty],64,88,7)
-		else
-			cprint("press ❎",64,114,1)
-			if btnp()~=0 then
-				haspressed,c=true,0
-			end
-		end
-		
-		if btnp()>255 then --bitfield where high bits are p2
+		--p2 controller button press detect
+		--for p2 join
+		if btnp()>255 then
 			ps[2].playing=not ps[2].playing
 		end
-		
+
+		if btnp(❎,0) or btnp(🅾️,0) then
+			break
+		end
+
 		print("2p join"..(ps[2].playing and "!" or "?"),
 			96,0,ps[2].playing and 12 or 1)
-		
+
 		color(1)
 		print("c"..smallcaps("asey"),108,117)
---		print(smallcaps("@").."c"..smallcaps("asey"),104,117)
 		print("l"..smallcaps("abrack"),100,122)
 
 		print(smallcaps("v").."."..version,1,122)
 		yield()
 	end
-	dset(2,difficulty)
 	sfx(37,-2)
 	seconds,minutes=0,0
-	
-	-- play tau 0 if noob or on practice difficulty
-	if difficulty==1 or dget(3)==0 then lvl=0 else lvl=1 end
 
-	mulligans=mulldiff[difficulty]
+	-- play tau 0 if noob or on practice difficulty
+--	if dget(3)==0 then lvl=0 else lvl=1 end
+	lvl=0
+
+	makelvl()
 	extralives=mulligans
 	state="wipe"
-	wipe=cocreate(wipe_anim)	
+	wipe=cocreate(wipe_anim)
 end
 -->8
 -- boss
@@ -1719,7 +1758,7 @@ r=3,steadyx=64,steadyy=64,lasthit=-100,
 spawnnum=3,finalsize=10,
 growdur=160,detht=0,
 floor={x=64,y=64,r=22},
-	
+
 update=function(_ENV)
 	if not enabled then return end
 	local targetplayer=closestplayer(boss)
@@ -1765,7 +1804,7 @@ update=function(_ENV)
 			add(rs,{x=bulge.tx,y=bulge.ty,
 											dx=cos(a)*spd,dy=sin(a)*spd,
 											r=bulge.r,enabled=true,hit=-10})
-			bulges={}	
+			bulges={}
 		end
 		state="spawn"
 	elseif state=="intro" then
@@ -1785,7 +1824,7 @@ update=function(_ENV)
 			--bob around
 		local modx=cos(time()/4+.7)*3
 		local mody=cos(time()/6)*3
-			--final pos	
+			--final pos
 		x,y=steadyx+modx,steadyy+mody
 	end
 end,
@@ -1799,12 +1838,12 @@ render=function(_ENV)
 	end
 	local c=tick-lasthit<10 and 7 or 15
 	local hit=tick-lasthit<10
-	if hit then 
+	if hit then
 		if tick%8<4 then
 			pal(14,8)
 		end
 	end
-	
+
 	local targetplayer=closestplayer(boss)
 	local top=atan2(targetplayer.x-x,targetplayer.y-y)
 --	local x1,y1,x2,y2=0,52,20,72
@@ -1853,13 +1892,13 @@ end,
 --		c.r*=1.1
 --		c.p+=.01
 --	end
---	
---	if cs[1] and cs[1].r>64 then 
---		deli(cs,1) 
+--
+--	if cs[1] and cs[1].r>64 then
+--		deli(cs,1)
 --	end
 --
---	if tick%15==0 
---	and i<6 
+--	if tick%15==0
+--	and i<6
 --	then
 --		i+=1
 --		local p=rnd()
@@ -1873,7 +1912,7 @@ end,
 -- for z=#cs,1,-1 do
 -- 	local sx = 64+cos(cs[z].p)*15
 -- 	local sy = 64+sin(cs[z].p)*15
--- 	circfill(sx,sy,cs[z].r, 0 | 0x1800)  	
+-- 	circfill(sx,sy,cs[z].r, 0 | 0x1800)
 --		if cs[z].id==6 then
 --			sspr(
 --				1,17, --source coord
@@ -1883,11 +1922,11 @@ end,
 --			)
 --		else
 --			circ(sx,sy,cs[z].r, 5 | 0x1800)
---		end			  	
+--		end
 -- end
--- 
+--
 -- pal(10,0)
--- if cs[1] then 
+-- if cs[1] then
 --		camera(cos(cs[1].p)*3,sin(cs[1].p)*3)
 -- end
 -- sspr(0,79,128,49,0,79)
@@ -2176,43 +2215,43 @@ __label__
 00000000000000000000000000000000000000000000000000000000066666666666666600000000000000000000000000000000000000000000000000000000
 
 __sfx__
-0005000005650096500e65013650176502165000000000001d6001e600216000000024600286002e6002f600000000000000000000001c6001d6001e6001f600000001f600206000000020600206000000021600
-000400000725008250082500a2500c2500f250132501d250232502c250332503e2500020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
+011000000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d70015700157001570014700147001470014700147001270012700127001470014700147001470014700
+010400000720008200082000a2000c2000f200132001d200232002c200332003e2000020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
 0006000a0b6100b6100b6100b6100a6100a6100b6100b6100b6100d6100d6000d6000d6000d6000d6000d60000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000e000702710027100471004710027100b7100b7100f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
-001000000a0500b0500c0500c0500c0500f0500f0500f050110501105013050130501605016050160501805018050180501b0501b0501b0501b05000000000000000000000000000000000000000000000000000
-011000000c1500a1000a1000a1000c1500a100001000a1000c1500a1000a1000a1000c1503310000100001000c1000c150001001d1000c1501b1001d1001f1000c1500010000100001000c150001000010000100
+010e000702700027000470004700027000b7000b7000f70005700047002e7002e7000370003700037000370003700037000370003700037000370003700077000770007700077000770000700007000070000700
+011000000a0000b0000c0000c0000c0000f0000f0000f000110001100013000130001600016000160001800018000180001b0001b0001b0001b00000000000000000000000000000000000000000000000000000
+011000000c1000a1000a1000a1000c1000a100001000a1000c1000a1000a1000a1000c1003310000100001000c1000c100001001d1000c1001b1001d1001f1000c1000010000100001000c100001000010000100
 000300002e3502e35016350113500f3500c3500a350163001330016300113000a30000300053000a3000730007300073000730007300073000c3000a300073000730000300003000030000300003000030000300
 000400000a2100a2100a2200a2300a2400a2500c2000c2000f2000f2001120016200162001b2001d2002220024200292002e200332003a2003f20000200002000020000200002000020000200002000020000200
 000500000e6600e6500e6400e6300e610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000200000c4500c4500c4500c45027450274502445024450274502745024450244500040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
 000400001b5501f550225502b55024550295503055033550005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
-000100003f5203f5203c5203a52037520375203752033520305202e520295202752024520245202252022520225201f5201d5201d5201d52018520185201652016520115200f5200f5200c5200a5200a52007520
+010100003f5003f5003c5003a50037500375003750033500305002e500295002750024500245002250022500225001f5001d5001d5001d50018500185001650016500115000f5000f5000c5000a5000a50007500
 000800000352000510075000750007500075000750007500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00020000316503165030650316503a70037700306502c6502d6502e650307003370033700276002c6502d6502c65030700276002d6502c650306503365000700007002a6502a650296500070024650226501f650
-001400000c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a120071200c1200a12007120031200f1200c1200a12007120
-011400000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a650006000060000600056500060000600006000a65005600036000060005650006000060000600
-011400001140011400114001140011400114001340016400114001340016400164001140011400114001140000400274002740027400274000040000400004000040000400004000040000400004000040000400
-011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
+011400000c1000a10007100031000f1000c1000a100071000c1002800007100031000f1000c1000a100071000c1000a10007100031000f1000c1000a100071000c1000a10007100031000f1000c1000a10007100
+01140000006000060000600056000060000600006000a600006000060000600056000060000600006000a600006000060000600056000060000600006000a6000560003600006000560000600006000060000000
+014000002d0002d0002d0002b00029000280002600028000290002800026000240002800028000280002b0002b0002b0002600026000260002600026000260002600026000260000000024000290002b0002b000
+011400000640014400114000000006400084000540000000064001440011400000000640008400054000000006400144001140000000064000840005400000000640014400114000000006400084000540000000
 000800000f5501b550275503355000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
-01020d123550033500305002e5002e5002b5002950027500225001b5001650013500115000f5000f5000f5000f5000f5000050000500005000050000500005000050000500005000050000500005000050000500
-010200003f5103c5103c5103a5103551035510335102e5102b5102b51029510275102451022510225101f5101d5101b510185101651013510115100f5100f5100c5100c5100a5100a51007510055100351003510
+01400000000002d7002d7002d7002b70029700287002670028700297002870026700247002870028700287002b7002b7002b7002670026700267002670026700267002670026700000000000024700297002b700
+010200003f5003c5003c5003a5003550035500335002e5002b5002b50029500275002450022500225001f5001d5001b500185001650013500115000f5000f5000c5000c5000a5000a50007500055000350003500
 000200000576022760297601d76007760077600070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
-010600003a4513745135451334511d4510f4510740100401074010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401
+000600003a4513745135451334511d4510f4510740100401074010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401004010040100401
 0108000005050070400a030130201f010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0008000005450074400a630136201f410004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
 000200000571022710297101d71007710077100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01180000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000000530c0531805324053300533c0533f05300000
-011800000065000000000000000000650000000000000000006500000000000000000065000000000000000000650000000000000000006500000000000000000065000000000000000000650000000000000000
-011800000505006050050500605005050060500505006050050500505006050050500605005050060500505006050050500605005050060500505006050050500505006050060500505005050060500505006050
-011800002a0532a0530000329053290530000300003000032a0532a0530000329053290530000300003000032a0532a0530000329053290530000300003000032a0532a053000032905329053000030000300003
-011800001505113051110511c0511f0511d0511c0511a0511a0501a0501a0501a0501a0501a0501a0501a05000000000010000100001000010000100001000010000000000000000000000000000000000000000
-011800001605114051120511d051200511e0511d0511b0511b0501b0501b0501b0501b0501b0501b0501b05019000020010200102001020010200102001020010200102001020010200102001020010200102001
+01180000000000c0001800024000300003c0003f00000000000000c0001800024000300003c0003f00000000000000c0001800024000300003c0003f00000000000000c0001800024000300003c0003f00000000
+011800000060000000000000000000600000000000000000006000000000000000000060000000000000000000600000000000000000006000000000000000000060000000000000000000600000000000000000
+011800000500006000050000600005000060000500006000050000500006000050000600005000060000500006000050000600005000060000500006000050000500006000060000500005000060000500006000
+011800002a0002a0000000029000290000000000000000002a0002a0000000029000290000000000000000002a0002a0000000029000290000000000000000002a0002a000000002900029000000000000000000
+011800001500013000110001c0001f0001d0001c0001a0001a0001a0001a0001a0001a0001a0001a0001a00000000000000000000000000000000000000000000000000000000000000000000000000000000000
+011800001600014000120001d000200001e0001d0001b0001b0001b0001b0001b0001b0001b0001b0001b00019000020000200002000020000200002000020000200002000020000200002000020000200002000
 01080000000000010300103001030010318113171131612315123121330d133061430214301153001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103
-01060000000000000000000000000c0100c0100c0100c0200c0200c0200c0200c0200c0300c0300c0300c0400c0400c0500c05000000000000000000000000000000000000000000000000000000000000000000
-000800200c0100c0100c0100c0100c0100c0100c0100c0200c0200c0200c0200c0200c0300c0300c0300c0400c0400c0500c0500c0500c0500c0500c0500c0500c0500c0500c0300c0300c0200c0200c0200c010
-0110000000500005003755000500005000050030550005000050000500005000050000500005003a550375000050000500005000000000000005003c5502e50000500005003c50000500005003a5003f55000000
-01100000000000000024550295002b5002e500000000000037500000003c5500000000000000000000000000000003f5002255000000000000000000000000003f500000002455000000000003f5003055000000
+01060000000000000000000000000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c00000000000000000000000000000000000000000000000000000000000000000000
+010800200c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c000
+0110000000500005003750000500005000050030500005000050000500005000050000500005003a500375000050000500005000000000000005003c5002e50000500005003c50000500005003a5003f50000000
+01100000000000000024500295002b5002e500000000000037500000003c5000000000000000000000000000000003f5002250000000000000000000000000003f500000002450000000000003f5003050000000
 000800200c0100c0100c0100c0100c0100c0100c0100c0200c0200c0200c0200c0200c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0200c0200c0200c010
 01080000120500c0500c0500c05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01100000180201e0201f0201f0201f020270003c00037000350003500033000300002e0002b00029000290002700027000240002400022000220001f0001d0001d0001b0001b0001b0001b000000000000000000
@@ -2221,37 +2260,63 @@ __sfx__
 01020000027700d770137700770002700017000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 01020000027500d7501375007700027700c7701c77026770137700f7700c7700a7700877006770057700477003770027700177000770007000070000700007000070000700007000070000700007000070000700
 000200002c01025010200101c01019010170101401012010100100e0100b010090100701006010050100401004010030100301003010030100301002010010100101000010000100001000010000100001000010
-000200001a7101a7201a7301a7301a7001a7101a7301a7701a7601a7501a7401a7301a7201a710007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-010c0000030540305003050030500f0050c0000f0050c000030540305003050030500f0000f0000f0000c000010540105001050010500f0000f0000f0000c000010540105001050010500f0000f0000f0000c000
-010c00000205402050020500205000000000000000000000020540205002050020500000000000000000000002054020500205002050000000000000000000000205402050020500205000000000000000000000
-010c00000503405030050300503006000060000600006000050340503005030050300000000000000000000005034050300503005030060000600006000060000703107031070300703000000000000000000000
-011400000645014400114000000006450084500545000000064501440011400000000645008450054500000006450144001140000000064500845005450000000645014400114000000006450084500545000000
-011400001645013450134500a4500a4500a45007450074500a4500a4500a4501d4503340033400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
-001000002803428030280302803028030280302803028030280302803028030280302803028030280302803028030280302803028030280302803028030280302803028030280302803028030280302803028030
-001000002d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d0302d030
+010200001a7001a7001a7001a7001a7001a7001a7001a7001a7001a7001a7001a7001a7001a700007000070000700160000070000700007000070000700007000070000700007000070000700007000070000700
+01020000060500a0501005020050330501c000290002f000060500a05010050200503305000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01010000004500145007450174502a450134002040026400004500145007450174502a450004000040000400004500145007450174502a4500040000400004000040000400004000040000400004000040000400
+010c0000030000300003000030000f0000c0000f0000c000030000300003000030000f0000f0000f0000c000010000100001000010000f0000f0000f0000c000010000100001000010000f0000f0000f0000c000
+010c00000200002000020000200000000000000000000000020000200002000020000000000000000000000002000020000200002000000000000000000000000200002000020000200000000000000000000000
+010c00000500005000050000500006000060000600006000050000500005000050000000000000000000000005000050000500005000060000600006000060000700007000070000700000000000000000000000
+011400000640014400114000000006400084000540000000064001440011400000000640008400054000000006400144001140000000064000840005400000000640014400114000000006400084000540000000
+011400001640013400134000a4000a4000a40007400074000a4000a4000a4001d4003340033400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
+011000002800028000280002800028000280002800028000280002500028000280002800028000280002800028000280002800028000280002800028000280002800028000280002800028000280002800028000
+011000002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d0002d000
+014000002d00026000280002900023000210001f0002100021000210001a0001a0001a0001a0001a0001a000280002800028000290002b0002900028000260002800028000280002800028000260002400023000
+014000002b7002d70026700287002970023700217001f7002600021700217001a7001a7001a7001a7001a7001a700287002870028700297002b70029700287002670028700287002870028700287002670024700
+011000000170001700017000170001700017000170001700017000170001700017000170001700017000170009700097000970008700087000870008700087000670006700067000870008700087000870008700
+011000000540005400054000540005400054000540005400054000540005400054000440004400054000540001400014000140001400014000140001400014000140001400014000140001400014000140001400
+011000000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d700
+011000000170001700017000170001700017000170001700017000170001700017000170001700017000170001700017000170001700017000170001700017000170001700017000170001700017000170001700
+0110000010000100001000010000000000000000000000000000000000000000000000000000000a0000a00011000110001100011000110001100011000110001100011000110001100010000110001000010000
+01100000157001570015700147001470014700147001470012700127001270014700147001470014700147000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d7000d700
+011000000970009700097000870008700087000870008700067000670006700087000870008700087000870001700017000170001700017000170001700017000170001700017000170001700017000170001700
 __music__
-00 0e0f4344
-00 0e0f4344
-02 0e110f44
-01 31424344
-02 30424344
-00 36354344
+00 4e4f4344
+00 4e4f4344
+02 4e514f44
+01 71424344
+02 70424344
+00 76754344
 00 41424344
 00 41424344
-01 1a1b4244
-00 1a1b1c44
-00 1a1b1c44
-00 401b1d44
-00 1b1e4344
-02 1b1f4344
+01 5a5b4244
+00 5a5b5c44
+00 5a5b5c44
+00 405b5d44
+00 5b5e4344
+02 5b5f4344
 00 41424344
 00 26294344
 00 41424344
 00 41424344
 00 41424344
 00 41424344
-01 22234344
-02 22244344
+01 62634344
+02 62644344
+00 41424344
+00 41424344
+01 50534244
+02 77784344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+01 40797a43
+00 7b7c7d47
+02 7e7f8080
+02 7b7c4c80
+00 80808080
+00 7b7c8044
+00 80808080
 
