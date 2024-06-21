@@ -8,17 +8,6 @@ __lua__
 -- palette bug?
 -- intro
 
---
-
---insurance covers 3 spares
---heroically
---last slide is back to just ship
---and no way to turn off the defenses
-
---there's no help coming
---how cool is that?
-
-
 --😐:
 -- unique death animations
 -- custom font? for tau
@@ -33,8 +22,6 @@ __lua__
 -- "return of zaag"? zaag returns
 --  zaag reblastered
 -- names like bacteria
--- new gameover screen
--- site? lance? terminology
 -- intro: a skill based video skill program
 --  for one or two players
 -- levels count down
@@ -77,14 +64,15 @@ gun=0 gunfull=240 gunfail=false gunfailtick=0
 --4: screenshake toggle (0 is on, 1 is off)
 
 dethmsgs=split(
-[[zigged when i shoulda zaaged
-sun was in my eyes
-mistakes were made
-testing ejector seat
-tax write-off
-had an oopsie-doopsie
-no one is perfect
-lag!
+[[zIGGED WHEN I SHOULDA ZAAGED
+sUN WAS IN MY EYES
+mISTAKES WERE MADE
+tESTING EJECTOR SEAT
+tAX WRITE-OFF
+hAD AN OOPSIE-DOOPSIE
+nO ONE IS PERFECT
+lAG!
+uGH, MORE PAPERWORK
 😐]],"\n")
 
 tips={
@@ -104,7 +92,7 @@ function _init()
 	poke(0x5f34,0x2)--inverse fill
 	cartdata("caseylabrack_zaag")
 	local swapped=dget(0)==1
-	fire_btn  = (not swapped) and ❎ or 🅾️
+	fire_btn = (not swapped) and ❎ or 🅾️
 	tele_btn = (not swapped) and 🅾️ or ❎
 	deathgifs=dget(1)==1
 	difficulty=dget(2)
@@ -153,17 +141,7 @@ function _init()
 		},{__index=_ENV}))
 	end
 
-
-	introco=cocreate(slides)
-	coresume(introco)
-
---	_update60=_mainupdate
---	_draw=_maindraw
---	tick=0
---	title=cocreate(title_setup)
-	_update60=function () end
---	_draw=introdraw
-	_draw=introdraw2
+	slides()
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 --	menuitem(2, "save screenshot", function () extcmd("screen") end)
@@ -195,7 +173,7 @@ end
 --	return true
 --end
 
-function _mainupdate()
+function _update60()
 tick+=1
 
 if tick%60==0 then
@@ -577,7 +555,7 @@ function died(player,cause)
 	end
 end
 
-function _maindraw()
+function _draw()
 cls()
 
 camera()
@@ -795,23 +773,7 @@ if title and costatus(title)~="dead" then coresume(title) end
 end
 
 -->8
---levels
-lvls={
---	[0]={flowers=1},
---	[0]={roids=1,lasers=1},
---	{roids=4,lasers=1},--1
---	{roids=6,lasers=1,safezone=true},--2
---	{roids=4,lasers=1,flowers=2},--3
---	{roids=5,lasers=1,flowers=3},--4
---	{roids=6,lasers=1,flowers=4,safezone=true},--5
---	{roids=4,bomb=true},--6
---	{roids=4,flowers=3,bomb=true},--7
---	{roids=3,flowers=2,bomb=true,lasers=1,safezone=true},--8
---	{roids=6,lasers=2},--9
---	{roids=8,lasers=2,safezone=true},--10
---	{roids=6,lasers=2,flowers=2,safezone=true},--11
-	{boss=1,lasers=3,safezone=true} --12
-}
+--transitions
 
 function wipe_anim()
 	yield()
@@ -877,6 +839,7 @@ function makelvl()
 	lvls.nosafezone=nil
 	--special levels override
 	if lvl==0 then lvls={flowers=1} end
+--	lvl=12
 	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
 end
 
@@ -1038,24 +1001,20 @@ function death(delay)
 end
 
 function gameover()
-	local start=tick
-	local c=0
-	local yt=54 --tracks y pos
 	local tip=rnd(tips)
 	while true do
-		c+=1
-		sspr(22,48,107,16,10,46)
+		sspr(20,40,107,16,10,46)
 
-		local ystart=yt+18
+		--print each line of the tip
+		local ytext=54+18
 		for i=1,#tip do
 			local msg=tip[i]
 			if i==1 then msg="tip: "..msg end
-			cprint(msg,64,ystart,6)
-			ystart+=6
+			cprint(msg,64,ytext,6)
+			ytext+=6
 		end
 		yield()
 	end
---	extralives=mullig
 end
 
 function deathmsg_anim()
@@ -1063,7 +1022,7 @@ function deathmsg_anim()
 	local ypos=62
 	while true do
 		cprint("pilot notes:", 64, ypos-8,7)
-		cprint("\""..smallcaps(msg).."\"",64,ypos,6)
+		cprint("\""..msg.."\"",64,ypos,6)
 		local mulls=extralives==1 and " spare" or " spares"
 --		local mulls=extralives==1 and " mulligan" or " mulligans"
 		cprint(""..extralives..mulls,64,ypos+24,13)
@@ -1128,7 +1087,7 @@ function gamewin_anim()
 	ps[1].enabled,ps[2].enabled=false,false
 
 --	local msg=rnd({"2 ez","gottem","booyah."})
-	local msg=split"gottem,booyah,2 ez."
+	local msg=split"gOTTEM,bOOYAH,2 EZ."
 	i,cp=180,dp
 	sfx(39)
 	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
@@ -1140,7 +1099,7 @@ function gamewin_anim()
 
 		cprint("every tau immaculate!", 64,30,7)
 		cprint("pilot notes:",64,54,7)
-		cprint("\""..smallcaps(rnd(msg)).."\"",64,62,6)
+		cprint("\""..rnd(msg).."\"",64,62,6)
 
 		cprint("time: "..final_time,64,84,13)
 
@@ -1264,224 +1223,14 @@ function circle(x,y,r,c)
 end
 
 --https://www.lexaloffle.com/bbs/?pid=88836#p
-function smallcaps(s)
-  local t=""
-  for i=1,#s do
-    local c=ord(s,i)
-    t..=chr(c>96 and c<123 and c-32 or c)
-  end
-  return t
-end
-
--->8
---misc
-
-function slides()
-
-	music(0)
-	local pat=0
-	--palette to hide/reveal art
-	local hidepal=split("0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
-	
-	while pat~=-1 do
-		cls()
-		local text=""
-
-		if pat==0 then
-			local note=stat(50)
-			local pct=note/31
-			pct=easeinexpo(pct)
-			local ratio=127/34
-			
-			--start size
-			local mwid=ratio*4
-			local mhid=4
-			--final size
-			local fwid=127
-			local fhid=34
-			--diffs
-			local dwid=fwid-mwid
-			local dhid=fhid-mhid		
-			--width/height this frame
-			local wid=mwid+dwid*pct
-			local hid=mhid+dhid*pct
-			--number of rects
-			local rs=100
-			--total (whole grid)
-			local twid=wid*(rs+1)
-			local thid=hid*(rs+1)
-	
-			clip(0,47,127,34)
-			camera(twid/2-64,thid/2-64)
-			for row=0,rs do
-				for col=0,rs do
-					rect(
-						col*wid,
-						row*hid,
-						col*wid+wid,
-						row*hid+hid,
-						13
-					)
-				end
-			end
-			rect(0,0,twid,thid,8)
-			camera()
-			clip()
-			text=
-[[welcome to the tau clusters.]]
-			print(smallcaps("scale (nanometers): "..flr(9/pct)),1,35,13)
-		end
-
-		--ship reveal
-		if mid(pat,1,2)==pat then
-			hidepal[7],hidepal[1]=7,9
-			text=
-[[your craft is manueverable,
-armed, and most importantly,
-disposable.
-
-you'll get only 2 spares per tau
-(for insurance reasons).
-]]			
-		end
-		--zoids reveal
-		if mid(pat,3,4)==pat then
-			hidepal[9]=nil hidepal[11]=nil hidepal[14]=nil hidepal[8]=nil
-			text=
-[[the threat: zaagella. 
-the flora blooms from some 
-unknown source beneath tau 1.
-
-your blaster cuts through zaag,
-but only fires one-at-a-time
-(regulatory requirement).
-]]			
-		end
-		--defenses reveal
-		if mid(pat,5,6)==pat then
-			hidepal[10]=8 hidepal[6]=nil hidepal[12]=14
-			text=
-[[automated defenses are useless
---against them. 
-
-there's no time to get disable 
-authorization (2 business-days).
-
-]]
-		end
-		
-		if pat==6 then
-			text=text.."good luck!"
-		end
-		rect(0,47,127,81,7)
-		pal(hidepal)
-		--126 width x 34 height
-		if pat>0 then
-			sspr(0,56,126,34,1,47)
-		end
-		pal()
-		print(text,1,85,7)
-		yield()
-		pat=stat(54)
-	end
---	music(-1)
-	_update60=_mainupdate
-	_draw=_maindraw
-	tick=0
-	title=cocreate(title_setup)
-end
-
-function introdraw2()
-	if costatus(introco)!="dead" then
-		assert(coresume(introco))
-	else
-		_draw=introdraw
-	end
-end
-
---homing bomb
-function newbomb()
-	return setmetatable({
-			r=3,dx=0,dy=0,t=.03,sight=48,
-			frametick=0,state="idle",muted=false,
-			spawn=function(_ENV)
-
-				--spawn out of range of player
-				--try to space apart from other bombs
-				local invalid=true
-				local c=0
-				while invalid and c<100 do
-					invalid=false
-					c+=1
---					if c==100 then stop("couldn't spawn bomb") end
-					local a=rnd()
-					local d=rndr(18,52)
-					x,y=64+cos(a)*d,64+sin(a)*d
-
-					--definitely away from player
-					local playerinrange=true
-					while playerinrange do
-						playerinrange=false
-						local a=rnd()
-						local d=rndr(18,52)
-						x,y=64+cos(a)*d,64+sin(a)*d
-						if dist(ps[1].x,ps[1].y,x,y)<sight then
-							playerinrange=true
-						end
-					end
-
-					--keep some range from others if you can
-					for h in all(hs) do
-						if dist(h.x,h.y,x,y)<20 then
-							invalid=true
-							goto hspawncontinue
-						end
-					end
-					::hspawncontinue::
-				end
-				dx,dy,frametick=0,0,0
-			end,
-
-			update=function(_ENV)
-				local target=closestplayer(h)
-				local d=dist(x,y,target.x,target.y)
-				if d<sight then
-					if state~="chase" and not muted then sfx(9) end
-					state="chase"
-					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
-					dx+=cos(a)*t dy+=sin(a)*t
-					frametick+=1
-				else
-					state="idle"
-				end
---				dx*=.99 dy*=.99
-				dx*=.97 dy*=.97
-				x+=dx	y+=dy
-				local a2=atan2(x-64,y-64)
-				if dist(x,y,64,64)<8 then
-					x,y=64+cos(a2)*8,64+sin(a2)*8
-				end
-				if dist(x,y,64,64)>63 then
-					x,y=64+cos(a2)*63,64+sin(a2)*63
-				end
-			end,
-
-			render=function(_ENV)
-				palt(10,true)
-				palt(0,false)
-				local _x,_y=0,0
-				if state~="chase" then
-					spr((tick%120)/60+3,x-4,y-4)
-				else
-					spr(frametick%16/4+16,x-4,y-4)
-					_x=dx<0 and 1 or 0
-					_y=dy<0 and 1 or 0
-					pset(x-_x,y-_y,8)
-				end
-				palt()
-			end,
-		},{__index=_ENV})
-end
+--function smallcaps(s)
+--  local t=""
+--  for i=1,#s do
+--    local c=ord(s,i)
+--    t..=chr(c>96 and c<123 and c-32 or c)
+--  end
+--  return t
+--end
 
 --palettes
 dp={ --default
@@ -1517,18 +1266,216 @@ bwp={ --fade to black
 	}
 }
 
---misc animations
-function rsplode(x,y,r,dx,dy)
-	local c=0
-	while c<10 do
-		c+=1
-		for i=i,12 do
-			pset(x+rnd(r),y+rnd(r),4)
+-->8
+--intro and outro
+
+function slides()
+
+	music(0)
+	local pat=0
+	--palette to hide/reveal art
+	local hidepal=split("1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+	local skipcount=0
+	
+	while pat~=-1 do
+		cls()
+		
+		if btn(❎) then
+			skipcount+=1
+			if skipcount>45 then
+				music(-1)
+			end
+		else
+			skipcount=0
 		end
-		x+=dx y+=dy
-		yield()
+		
+		print("❎SKIP",105,0,1)
+		clip(105,0,23*skipcount/45,8)
+		print("❎SKIP",105,0,12)
+		clip()
+		
+		local text=""
+
+		if pat==0 then
+			--% of pattern 0
+			local pct=stat(50)/31
+			pct=easeinexpo(pct)
+			
+--			local ratio=3.7353--127/34
+			
+--			--start size
+--			local mwid=ratio*4
+--			local mhid=4
+--			--final size
+--			local fwid=127
+--			local fhid=34
+--			--diffs
+--			dwid=fwid-mwid
+--			dhid=fhid-mhid		
+--			--width/height this frame
+--			local wid=mwid+dwid*pct
+--			local hid=mhid+dhid*pct
+--			--number of rects
+--			local rs=100
+--			--total (whole grid)
+--			local twid=wid*(rs+1)
+--			local thid=hid*(rs+1)
+	
+			--hardcoded values for above
+			local wid=14.9412+112.0588*pct
+			local hid=4+30*pct
+			
+			clip(0,47,127,34)
+			camera(wid*(101)/2-64,hid*(101)/2-64)
+			for row=0,101 do
+				for col=0,101 do
+					rect(
+						col*wid,
+						row*hid,
+						col*wid+wid,
+						row*hid+hid,
+						13
+					)
+				end
+			end
+			camera()
+			clip()
+			text=
+[[welcome to the tau clusters.]]
+			print("NANOMETERS: "..flr(9/pct),1,40,13)
+		end
+
+		--ship reveal
+		if mid(pat,1,2)==pat then
+			hidepal[7],hidepal[1]=7,9
+			text=
+[[your craft is manueverable,
+armed, and most importantly,
+disposable.
+
+you'll get only 2 spares per tau
+(for insurance reasons).
+]]			
+		end
+		--zoids reveal
+		if mid(pat,3,4)==pat then
+			hidepal[9]=nil hidepal[11]=nil hidepal[14]=nil hidepal[8]=nil
+			text=
+[[the threat: zaagella flora. 
+it spreads from beneath tau 1.
+
+your blaster cuts through zaag,
+but only fires one-at-a-time
+(regulatory requirement).
+]]			
+		end
+		--defenses reveal
+		if mid(pat,5,6)==pat then
+			hidepal[10]=8 hidepal[6]=nil hidepal[12]=14
+			text=
+[[automated defenses are useless
+--against them. 
+
+there's no time to disable them 
+(requires 2 business-days).
+
+]]
+		end
+		
+		if pat==6 then
+			text=text.."good luck!"
+		end
+		rect(0,47,127,81,7)
+		pal(hidepal)
+		--126 width x 34 height
+		if pat>0 then
+			sspr(0,56,126,34,1,47)
+		end
+		pal()
+		print(text,1,85,7)
+		flip()
+		pat=stat(54)
 	end
+	tick=0
+	title=cocreate(title_setup)
 end
+
+--intro
+
+--cs={}
+--tick=0
+--i=0
+
+--function introdraw()
+--	tick+=1
+--
+--	for c in all(cs) do
+--		c.r*=1.1
+--		c.p+=.01
+--	end
+--
+--	if cs[1] and cs[1].r>64 then
+--		deli(cs,1)
+--	end
+--
+--	if tick%15==0
+--	and i<6
+--	then
+--		i+=1
+--		local p=rnd()
+--		if #cs~=0 then
+--			p=cs[#cs].p+rndr(-.25,.1)
+--		end
+--		add(cs,{r=1,p=p,id=i})
+--	end
+--
+--	cls()
+-- for z=#cs,1,-1 do
+-- 	local sx = 64+cos(cs[z].p)*15
+-- 	local sy = 64+sin(cs[z].p)*15
+-- 	circfill(sx,sy,cs[z].r, 0 | 0x1800)
+--		if cs[z].id==6 then
+--			sspr(
+--				1,17, --source coord
+--				19,19, --source w/h
+--				sx-cs[z].r,sy-cs[z].r,--destination coord
+--				cs[z].r*2,cs[z].r*2 -- destination w/h
+--			)
+--		else
+--			circ(sx,sy,cs[z].r, 5 | 0x1800)
+--		end
+-- end
+--
+-- pal(10,0)
+-- if cs[1] then
+--		camera(cos(cs[1].p)*3,sin(cs[1].p)*3)
+-- end
+-- sspr(0,79,128,49,0,79)
+--	pal()
+--	color(1)
+--	line(38,90,0,0)
+--	line(39,90,3,0)
+--	line(89,90,128,0)
+--	line(88,90,125,0)
+--	rectfill(30,102,49,108,0)
+--	print("TAU"..(99-i),31,103,1)
+--
+--	rect(93,118,122,126)
+--	print("BLAST",55,119)
+--	circ(118,122,1,8)
+
+--	gauges
+--	local ang=t()/50
+--	line(38,118,38+cos(ang)*8,118+sin(ang)*8,1)
+--	line(80,111,80+13*sin(-tick/10000),111,1)
+--	line(80,114,80+13*sin(-tick/12000)+3,114,1)
+--	if tick==180 then
+--		_update60=_mainupdate
+--		_draw=_maindraw
+--		tick=0
+--		title=cocreate(title_setup)
+--	end
+--end
 -->8
 --player
 
@@ -1757,7 +1704,7 @@ end
 -->8
 --title screen
 function title_setup()
---	tick=0
+	local title⧗=0
 	sfx(37)
 	clearlevel()
 	inner.enabled=true
@@ -1791,6 +1738,7 @@ function title_setup()
 	yield()
 
 	while true do
+		title⧗+=1
 --give the bomb something to chase
 		if rnd()>.95 then
 			ps[1].x,ps[1].y=rnd(128),rnd(128)
@@ -1808,7 +1756,7 @@ function title_setup()
 			ps[2].playing=not ps[2].playing
 		end
 
-		if btnp(❎,0) or btnp(🅾️,0) then
+		if title⧗>120 and btnp(❎,0) then
 			break
 		end
 
@@ -1816,16 +1764,16 @@ function title_setup()
 			96,0,ps[2].playing and 12 or 1)
 
 		color(1)
-		print("c"..smallcaps("asey"),108,117)
-		print("l"..smallcaps("abrack"),100,122)
+		print("cASEY",108,117)
+		print("lABRACK",100,122)
 
-		print(smallcaps("v").."."..version,1,122)
+		print("V."..version,1,122)
 		yield()
 	end
 	sfx(37,-2)
 	seconds,minutes=0,0
 
-	-- play tau 0 if noob or on practice difficulty
+-- play tau 0 if noob or on practice difficulty
 --	if dget(3)==0 then lvl=0 else lvl=1 end
 	lvl=0
 
@@ -1835,7 +1783,7 @@ function title_setup()
 	wipe=cocreate(wipe_anim)
 end
 -->8
--- boss
+-- enemies
 boss =
 setmetatable({
 enabled=false,
@@ -1963,92 +1911,112 @@ spawn=function(_ENV)
 	state,start,detht="spawn",0,0
 end,
 },{__index=_ENV})
--->8
---intro
 
---cs={}
---tick=0
---i=0
+--homing bomb
+function newbomb()
+	return setmetatable({
+			r=3,dx=0,dy=0,t=.03,sight=48,
+			frametick=0,state="idle",muted=false,
+			spawn=function(_ENV)
 
---function introdraw()
---	tick+=1
---
---	for c in all(cs) do
---		c.r*=1.1
---		c.p+=.01
---	end
---
---	if cs[1] and cs[1].r>64 then
---		deli(cs,1)
---	end
---
---	if tick%15==0
---	and i<6
---	then
---		i+=1
---		local p=rnd()
---		if #cs~=0 then
---			p=cs[#cs].p+rndr(-.25,.1)
---		end
---		add(cs,{r=1,p=p,id=i})
---	end
---
---	cls()
--- for z=#cs,1,-1 do
--- 	local sx = 64+cos(cs[z].p)*15
--- 	local sy = 64+sin(cs[z].p)*15
--- 	circfill(sx,sy,cs[z].r, 0 | 0x1800)
---		if cs[z].id==6 then
---			sspr(
---				1,17, --source coord
---				19,19, --source w/h
---				sx-cs[z].r,sy-cs[z].r,--destination coord
---				cs[z].r*2,cs[z].r*2 -- destination w/h
---			)
---		else
---			circ(sx,sy,cs[z].r, 5 | 0x1800)
---		end
--- end
---
--- pal(10,0)
--- if cs[1] then
---		camera(cos(cs[1].p)*3,sin(cs[1].p)*3)
--- end
--- sspr(0,79,128,49,0,79)
---	pal()
---	color(1)
---	line(38,90,0,0)
---	line(39,90,3,0)
---	line(89,90,128,0)
---	line(88,90,125,0)
---	rectfill(30,102,49,108,0)
---	print("TAU"..(99-i),31,103,1)
---
---	rect(93,118,122,126)
---	print("BLAST",55,119)
---	circ(118,122,1,8)
+				--spawn out of range of player
+				--try to space apart from other bombs
+				local invalid=true
+				local c=0
+				while invalid and c<100 do
+					invalid=false
+					c+=1
+--					if c==100 then stop("couldn't spawn bomb") end
+					local a=rnd()
+					local d=rndr(18,52)
+					x,y=64+cos(a)*d,64+sin(a)*d
 
---	gauges
---	local ang=t()/50
---	line(38,118,38+cos(ang)*8,118+sin(ang)*8,1)
---	line(80,111,80+13*sin(-tick/10000),111,1)
---	line(80,114,80+13*sin(-tick/12000)+3,114,1)
---	if tick==180 then
---		_update60=_mainupdate
---		_draw=_maindraw
---		tick=0
---		title=cocreate(title_setup)
---	end
---end
+					--definitely away from player
+					local playerinrange=true
+					while playerinrange do
+						playerinrange=false
+						local a=rnd()
+						local d=rndr(18,52)
+						x,y=64+cos(a)*d,64+sin(a)*d
+						if dist(ps[1].x,ps[1].y,x,y)<sight then
+							playerinrange=true
+						end
+					end
+
+					--keep some range from others if you can
+					for h in all(hs) do
+						if dist(h.x,h.y,x,y)<20 then
+							invalid=true
+							goto hspawncontinue
+						end
+					end
+					::hspawncontinue::
+				end
+				dx,dy,frametick=0,0,0
+			end,
+
+			update=function(_ENV)
+				local target=closestplayer(h)
+				local d=dist(x,y,target.x,target.y)
+				if d<sight then
+					if state~="chase" and not muted then sfx(9) end
+					state="chase"
+					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+					dx+=cos(a)*t dy+=sin(a)*t
+					frametick+=1
+				else
+					state="idle"
+				end
+--				dx*=.99 dy*=.99
+				dx*=.97 dy*=.97
+				x+=dx	y+=dy
+				local a2=atan2(x-64,y-64)
+				if dist(x,y,64,64)<8 then
+					x,y=64+cos(a2)*8,64+sin(a2)*8
+				end
+				if dist(x,y,64,64)>63 then
+					x,y=64+cos(a2)*63,64+sin(a2)*63
+				end
+			end,
+
+			render=function(_ENV)
+				palt(10,true)
+				palt(0,false)
+				local _x,_y=0,0
+				if state~="chase" then
+					spr((tick%120)/60+3,x-4,y-4)
+				else
+					spr(frametick%16/4+16,x-4,y-4)
+					_x=dx<0 and 1 or 0
+					_y=dy<0 and 1 or 0
+					pset(x-_x,y-_y,8)
+				end
+				palt()
+			end,
+		},{__index=_ENV})
+end
+
+--misc animations
+function rsplode(x,y,r,dx,dy)
+	local c=0
+	while c<10 do
+		c+=1
+		for i=i,12 do
+			pset(x+rnd(r),y+rnd(r),4)
+		end
+		x+=dx y+=dy
+		yield()
+	end
+end
 __gfx__
-000000000000000000000000000000000000000000c00c0000000000000000000000000000000000000000000000000000008000000000000000000000000000
-00000000000000000000000000000000000000000c0cc0c000000000000000000000000000000000000000000000000000887800000000000000000000000000
-0070070000000000000000000000000000000000c0c66c0c00000000000000000000000000000888800000000000000008777800000000000000000000000000
-00077000000000000008000000000000000000000c6666c000000000000000000000000000088777780000000000000088777800000000000000000000000000
-00077000000000000080800000000000000000000c6666c000000000000000000000000008877777778000000000000087777800000000000000000000000000
-0070070000000000000800000000000000000000c0c66c0c00000000000000000000000887777777778000000000000887777800000000888880000000000000
-00000000000000000000000000000000000000000c0cc0c000000000000000000000008777777777788000000000000877877800000008777780000000000000
-000000000000000000000000000000000000000000c00c0000000000000000000000008777777777780000000000008877877800000087777778000000000000
+000000000000000000000000eaaaaaaeeaaaaaae00c00c0000000000000000000000000000000000000000000000000000008000000000000000000000000000
+000000000000000000000000aeaaaaeaaeaaaaea0c0cc0c000000000000000000000000000000000000000000000000000887800000000000000000000000000
+007007000000000000000000aaeeeeaaaaeeeeaac0c66c0c00000000000000000000000000000888800000000000000008777800000000000000000000000000
+000770000000000000080000aae08eaaaae80eaa0c6666c000000000000000000000000000088777780000000000000088777800000000000000000000000000
+000770000000000000808000aae80eaaaae08eaa0c6666c000000000000000000000000008877777778000000000000087777800000000000000000000000000
+007007000000000000080000aaeeeeaaaaeeeeaac0c66c0c00000000000000000000000887777777778000000000000887777800000000888880000000000000
+000000000000000000000000aeaaaaeaaeaaaaea0c0cc0c000000000000000000000008777777777788000000000000877877800000008777780000000000000
+000000000000000000000000eaaaaaaeeaaaaaae00c00c0000000000000000000000008777777777780000000000008877877800000087777778000000000000
 aeaaaaaaaaeaaaaaaaaeaaaaaaaaeaaa000800000e00000000700000eaaaaaae0000087777777777780088880000008777877800000877777778000000000000
 aaeaaaaeaaaeaaaaaaaaeaaaaaaaaeaa0080800000e0000e00700000aeaaaaea0000087777788777800877788000088778877800008777777778000000000000
 aaeeeeeaaaeeeeaeaaeeeeaaaeeeeeaa08eee80000eeeee007770000aaeeeeaa0000877778887777800877778000087778877800008777777780000000000000
