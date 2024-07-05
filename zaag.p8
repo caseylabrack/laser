@@ -5,26 +5,24 @@ __lua__
 -- casey labrack
 
 --todo:
--- try text transition on slide
+-- endless mode
+-- reprise theme for boss
+-- rename boss
+-- sounds for boss
+-- outro
+-- test repulsive force for seekers
 -- palette bug?
--- intro
 
 --😐:
 -- unique death animations
 -- custom font? for tau
--- music?
--- toggle enable flip? 'enable ship flip'
 -- option: skip tau 0
--- do away with difficulty?
 -- mulligans? (if you die within one sec)
--- cutscene fuzzy dice
 -- gameover progress of enemy sprites
 --  with boss at the end of line
--- "return of zaag"? zaag returns
---  zaag reblastered
+-- zaag reblastered. "return of zaag"? zaag returns
 -- intro: a skill based video skill program
 --  for one or two players
--- levels count down
 
 version=53
 _g=_ENV
@@ -141,6 +139,7 @@ function _init()
 		},{__index=_ENV}))
 	end
 
+	_update60=_mainupdate
 	slides()
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
@@ -173,8 +172,21 @@ end
 --	return true
 --end
 
-function _update60()
+--function _update60()
+function _mainupdate()
+
+--if btn(🅾️) then
+--	_update60 = nil
+--	slides()
+--end
+
 tick+=1
+
+-- pause for boss theme reprise
+--if stat(46)==33 and extralives==2 then
+if stat(54)==5 or stat(54)==6 then
+	return
+end
 
 if tick%60==0 then
 	seconds+=1
@@ -524,6 +536,8 @@ end
 
 -- game win
 if boss.enabled and state~="win" and boss.hp<0 then
+	lvl+=1
+	makelvl()
 	sfx(40)
 	state="win"
 	local a=cocreate(gamewin_anim)
@@ -531,7 +545,7 @@ if boss.enabled and state~="win" and boss.hp<0 then
 	add(a2,a)
 end
 
-end
+end --update
 
 
 function died(player,cause)
@@ -745,7 +759,7 @@ if boss.enabled then
 end
 
 if state=="running" or state=="setup" then
-	print("tau "..lvl,0,2,7)
+	print("tau "..12-lvl,0,2,7)
 	for i=1,extralives do
 		spr(22,i*6-6,10)
 	end
@@ -937,7 +951,9 @@ function spawn()
 			if unit=="boss" then
 				boss:spawn()
 --				sfx(38)
-				music(15)
+--				music(8)
+--				sfx(33)
+--					music(5)
 				break
 			end
 			c=i
@@ -946,10 +962,11 @@ function spawn()
 		end
 	end
 	c=i
+--	if lvl==12 then music(5) end
+--	if lvl==12 then sfx(33,0) end
 	while c>0 do c-=1 yield() end
 	state="running"
 	extcmd("rec")
-	music(32,2000)
 end
 
 function death(delay)
@@ -1087,27 +1104,46 @@ function gamewin_anim()
 	ps[1].enabled,ps[2].enabled=false,false
 
 --	local msg=rnd({"2 ez","gottem","booyah."})
-	local msg=split"gOTTEM,bOOYAH,2 EZ."
+	local msg=rnd(split"gOTTEM,bOOYAH,2 EZ.")
 	i,cp=180,dp
 	sfx(39)
-	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
+	local loop=true
+	local continue=false
+	while loop do
+--	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
 		local pct=i/180
 --		cp=bwp[ceil(pct*#bwp)]
 		i-=1
 
 --		local ypos=62
 
+		if btnp(❎) then
+			continue=true
+			loop=false
+		end
+		
+		if btnp(🅾️) then
+			continue=false
+			loop=false
+		end
+
 		cprint("every tau immaculate!", 64,30,7)
 		cprint("pilot notes:",64,54,7)
-		cprint("\""..rnd(msg).."\"",64,62,6)
+		cprint("\""..msg.."\"",64,62,6)
 
 		cprint("time: "..final_time,64,84,13)
 
 		yield()
 	end
 	ps[1].enabled,ps[2].enabled=false,false
-	state="title"
-	title=cocreate(title_setup)
+	
+	if continue then
+		wipe=cocreate(wipe_anim)
+		state="wipe"
+	else 
+		state="title"
+		title=cocreate(title_setup)		
+	end
 end
 
 function clearlevel()
@@ -1292,7 +1328,7 @@ function slides()
 		
 		if btn(➡️) then
 			skipcount+=1
-			if skipcount>45 then
+			if skipcount>30 then
 				music(-1)
 			end
 		else
@@ -1300,7 +1336,7 @@ function slides()
 		end
 		
 		print("➡️ TO SKIP",89,120,13)
-		clip(89,120,39*skipcount/45,8)
+		clip(89,120,39*skipcount/30,8)
 		print("➡️ TO SKIP",89,120,7)
 		clip()
 		
@@ -1412,7 +1448,6 @@ there's no time to disable them
 		lpat=pat
 		flip()
 	end
-	tick=0
 	title=cocreate(title_setup)
 end
 
@@ -1764,15 +1799,14 @@ function title_setup()
 		sspr(65,0,51,39,39,18)
 		pal()
 
-		cprint("press ❎",64,114,1)
-
 		--p2 controller button press detect
 		--for p2 join
 		if btnp()>255 then
 			ps[2].playing=not ps[2].playing
 		end
 
-		if title⧗>120 and btnp(❎,0) then
+		if title⧗>60 then cprint("press ❎",64,114,1) end
+		if title⧗>60 and btnp(❎,0) then
 			break
 		end
 
@@ -1787,13 +1821,17 @@ function title_setup()
 		yield()
 	end
 	
+--	slides()
+	
 	sfx(37,-2)
 	seconds,minutes=0,0
 
 -- play tau 0 if noob or on practice difficulty
 --	if dget(3)==0 then lvl=0 else lvl=1 end
-	lvl=0
+--	lvl=0
+	lvl=12
 
+	tick=0
 	makelvl()
 	extralives=mulligans
 	state="wipe"
@@ -1924,7 +1962,7 @@ end,
 
 spawn=function(_ENV)
 	enabled,bulges=true,{}
-	x,y,r,hp=64,64,10,360
+	x,y,r,hp=64,64,10,10--360
 	state,start,detht="spawn",0,0
 end,
 },{__index=_ENV})
@@ -2313,12 +2351,12 @@ __sfx__
 000200000571022710297101d71007710077100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01100000094400944009440094400644006440054400544005442054400544005440054000540000400004000040000400004000040000400004000040000000000000000000000000000a4400a4400a4400a440
 001000001974219740197401974519744197441974419744197751977219772197700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000d7420d7400d7400d7450d7440d7440d7440d7440d7750d7720d7720d7700070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
-001000001546015460154601546012460124601146011460154701547215472154700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+011000000d7420d7400d7400d7450d7440d7440d7440d7440d7750d7720d7720d7700070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
+011000001546015460154601546012460124601146011460154701547215472154700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000114701147211472114700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-011800001600014000120001d000200001e0001d0001b0001b0001b0001b0001b0001b0001b0001b0001b00019000020000200002000020000200002000020000200002000020000200002000020000200002000
+011000000944009440094400944006440064400544005440094400944209442094400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01080000000000010300103001030010318113171131612315123121330d133061430214301153001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103
-01060000000000000000000000000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c00000000000000000000000000000000000000000000000000000000000000000000
+01100000034400344003440034400344003440054400544006440064400644006440094400944009440094400a4400a4400a4400a4400a4400a4400a4400a4400840008400084000840006400064000640006400
 010800200c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c000
 0110000000500005003750000500005000050030500005000050000500005000050000500005003a500375000050000500005000000000000005003c5002e50000500005003c50000500005003a5003f50000000
 01100000000000000024500295002b5002e500000000000037500000003c5000000000000000000000000000000003f5002250000000000000000000000000003f500000002450000000000003f5003050000000
@@ -2358,8 +2396,8 @@ __music__
 00 04051144
 00 1b1c1d1e
 00 41424344
-01 5a5b4244
-00 5a5b5c44
+01 115b4244
+00 1f5b5c44
 00 5a5b5c44
 00 405b5d44
 00 5b5e4344
