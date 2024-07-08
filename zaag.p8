@@ -5,7 +5,6 @@ __lua__
 -- casey labrack
 
 --todo:
--- endless mode
 -- reprise theme for boss
 -- rename boss
 -- boss emerge animation
@@ -142,8 +141,9 @@ function _init()
 	end
 
 	_update60=_mainupdate
-	_draw=_maindraw
-	slides()
+--	_draw=_maindraw
+			_draw=_outro
+--	slides()
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 --	menuitem(2, "save screenshot", function () extcmd("screen") end)
@@ -1464,21 +1464,21 @@ local zooms={}
 local zoom⧗=0
 
 function _outro ()
-	if zoom⧗==0 then sfx(34,0) end
 
 	zoom⧗+=1
 			
 	if zoom⧗%60==0 then
-		local p=rnd()
-		if #zooms~=0 then
-			p=zooms[#zooms].p+rndr(-.25,.1)
-		end
-		add(zooms,{r=1,p=p})
+		add(zooms,{r=1,p=rnd()})
 	end
 		
---	cp=bwp[ceil(zoom⧗/180*#bwp)]	
-		
 	cls()
+
+	if zoom⧗<60 then
+		return
+	end
+
+	if zoom⧗==60 then sfx(34,0) end
+
  for z=#zooms,1,-1 do
  	zooms[z].r*=1.05
 		zooms[z].p+=.005
@@ -1488,6 +1488,11 @@ function _outro ()
  	circfill(sx,sy,zooms[z].r, 0 | 0x1800)
 		circ(sx,sy,zooms[z].r, 5 | 0x1800)
  end
+
+	cprint("pilot notes:",64,24,7)
+	if stat(50)>12 or stat(46)==-1 then
+ 	cprint("\"BOOYAH\"",64,30,6)
+	end
 
  pal(10,0)
  sspr(0,90,128,49,0,90)
@@ -1499,16 +1504,6 @@ function _outro ()
 	line(89,90,128,0)
 	line(88,90,125,0)
 
-	color(7)
-	if zoom⧗>120 then
-		cprint("pilot notes:",64,24,7)
-	end
---	if zoom⧗==150 then sfx(39) end
-	if zoom⧗>150 then
-		
-		cprint("\"".."booyah".."\"",64,30,6)
-	end
-	
 	if zoom⧗>360 then
 		cprint("endless mode ➡️",64,64,13)
 		cprint("⬅️ titlescreen",64,70,13)
