@@ -8,8 +8,10 @@ __lua__
 -- endless mode
 -- reprise theme for boss
 -- rename boss
+-- boss emerge animation
 -- sounds for boss
 -- outro
+-- deepest high score
 -- test repulsive force for seekers
 -- palette bug?
 
@@ -140,6 +142,7 @@ function _init()
 	end
 
 	_update60=_mainupdate
+	_draw=_maindraw
 	slides()
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
@@ -538,7 +541,7 @@ end
 if boss.enabled and state~="win" and boss.hp<0 then
 	lvl+=1
 	makelvl()
-	sfx(40)
+	sfx(40,0)
 	state="win"
 	local a=cocreate(gamewin_anim)
 	coresume(a)
@@ -569,7 +572,8 @@ function died(player,cause)
 	end
 end
 
-function _draw()
+function _maindraw()
+--function _draw()
 cls()
 
 camera()
@@ -1061,25 +1065,18 @@ function gamewin_anim()
 --stop timer, convert to formatted string
 	local final_time=""..minutes..":"..(seconds<10 and "0"..seconds or seconds)
 
-	local i=90
-	for v in all(rs) do --roids
-		local z=cocreate(rsplode)
-		coresume(z,v.x,v.y,v.r,v.dx,v.dy)
-		add(a2,z)
+	for v in all(rs) do
 		del(rs,v)
 	end
 
 	for b in all(boss.bulges) do
-		local z=cocreate(rsplode)
-		coresume(z,b.x,b.y,b.r,0,0)
-		add(a2,z)
 		del(boss.bulges,b)
 	end
 
-	while i>0 do -- delay for boss outro
-		i-=1
-
-		local pct=1-i/180
+	--while boss shrinking sound playing
+	while stat(46)~=-1 do 
+	
+		local pct=stat(50)/32
 		boss.detht=pct
 		local dx,dy=64-boss.steadyx,64-boss.steadyy
 		dx*=.1
@@ -1092,58 +1089,70 @@ function gamewin_anim()
 
 		yield()
 	end
-	i=120
-	while i>0 do --fade out
-		local pct=1-i/120
-		cp=bwp[ceil(pct*#bwp)]
-		i-=1
-		yield()
-	end
+	
 	clearlevel()
-	inner.enabled=false
 	ps[1].enabled,ps[2].enabled=false,false
+	_draw=_outro
+	
+ 
+--	i=120
+--	while i>0 do --fade out
+--		local pct=1-i/120
+--		cp=bwp[ceil(pct*#bwp)]
+--		i-=1
+--		yield()
+--	end
+--	clearlevel()
+--	inner.enabled=false
+--	ps[1].enabled,ps[2].enabled=false,false
 
 --	local msg=rnd({"2 ez","gottem","booyah."})
-	local msg=rnd(split"gOTTEM,bOOYAH,2 EZ.")
-	i,cp=180,dp
-	sfx(39)
-	local loop=true
-	local continue=false
-	while loop do
+--	local msg=rnd(split"gOTTEM,bOOYAH,2 EZ.")
+--	i,cp=180,dp
+--	sfx(39)
+--	
+	
+--	local loop=true
+--	local continue=false
+--	while loop do
 --	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
-		local pct=i/180
+--		local pct=i/180
 --		cp=bwp[ceil(pct*#bwp)]
-		i-=1
+--		i-=1
 
 --		local ypos=62
 
-		if btnp(❎) then
-			continue=true
-			loop=false
-		end
+		--endless mode
+--		if btnp(➡️) then
+--			continue=true
+--			loop=false
+--		end
+--		
+--		--titlescreen
+--		if btnp(⬅️) then
+--			continue=false
+--			loop=false
+--		end
+
+--		cprint("every tau immaculate!", 64,30,7)
+--		cprint("pilot notes:",64,54,7)
+--		cprint("\""..msg.."\"",64,62,6)
+--
+--		cprint("time: "..final_time,64,84,13)
+
 		
-		if btnp(🅾️) then
-			continue=false
-			loop=false
-		end
-
-		cprint("every tau immaculate!", 64,30,7)
-		cprint("pilot notes:",64,54,7)
-		cprint("\""..msg.."\"",64,62,6)
-
-		cprint("time: "..final_time,64,84,13)
-
-		yield()
-	end
-	ps[1].enabled,ps[2].enabled=false,false
-	
-	if continue then
-		wipe=cocreate(wipe_anim)
-		state="wipe"
-	else 
-		state="title"
-		title=cocreate(title_setup)		
-	end
+	 
+--		yield()
+--	end
+--	ps[1].enabled,ps[2].enabled=false,false
+--	
+--	if continue then
+--		wipe=cocreate(wipe_anim)
+--		state="wipe"
+--	else 
+--		state="title"
+--		title=cocreate(title_setup)		
+--	end
 end
 
 function clearlevel()
@@ -1451,82 +1460,72 @@ there's no time to disable them
 	title=cocreate(title_setup)
 end
 
---intro
+local zooms={}
+local zoom⧗=0
 
---cs={}
---tick=0
---i=0
+function _outro ()
+	if zoom⧗==0 then sfx(34,0) end
 
---function introdraw()
---	tick+=1
---
---	for c in all(cs) do
---		c.r*=1.1
---		c.p+=.01
---	end
---
---	if cs[1] and cs[1].r>64 then
---		deli(cs,1)
---	end
---
---	if tick%15==0
---	and i<6
---	then
---		i+=1
---		local p=rnd()
---		if #cs~=0 then
---			p=cs[#cs].p+rndr(-.25,.1)
---		end
---		add(cs,{r=1,p=p,id=i})
---	end
---
---	cls()
--- for z=#cs,1,-1 do
--- 	local sx = 64+cos(cs[z].p)*15
--- 	local sy = 64+sin(cs[z].p)*15
--- 	circfill(sx,sy,cs[z].r, 0 | 0x1800)
---		if cs[z].id==6 then
---			sspr(
---				1,17, --source coord
---				19,19, --source w/h
---				sx-cs[z].r,sy-cs[z].r,--destination coord
---				cs[z].r*2,cs[z].r*2 -- destination w/h
---			)
---		else
---			circ(sx,sy,cs[z].r, 5 | 0x1800)
---		end
--- end
---
--- pal(10,0)
--- if cs[1] then
---		camera(cos(cs[1].p)*3,sin(cs[1].p)*3)
--- end
--- sspr(0,79,128,49,0,79)
---	pal()
---	color(1)
---	line(38,90,0,0)
---	line(39,90,3,0)
---	line(89,90,128,0)
---	line(88,90,125,0)
---	rectfill(30,102,49,108,0)
---	print("TAU"..(99-i),31,103,1)
---
---	rect(93,118,122,126)
---	print("BLAST",55,119)
---	circ(118,122,1,8)
+	zoom⧗+=1
+			
+	if zoom⧗%60==0 then
+		local p=rnd()
+		if #zooms~=0 then
+			p=zooms[#zooms].p+rndr(-.25,.1)
+		end
+		add(zooms,{r=1,p=p})
+	end
+		
+--	cp=bwp[ceil(zoom⧗/180*#bwp)]	
+		
+	cls()
+ for z=#zooms,1,-1 do
+ 	zooms[z].r*=1.05
+		zooms[z].p+=.005
+		if zooms[z].r>84 then deli(zooms,z) end
+ 	local sx=64+cos(zooms[z].p)*15
+ 	local sy=64+sin(zooms[z].p)*15
+ 	circfill(sx,sy,zooms[z].r, 0 | 0x1800)
+		circ(sx,sy,zooms[z].r, 5 | 0x1800)
+ end
 
---	gauges
---	local ang=t()/50
---	line(38,118,38+cos(ang)*8,118+sin(ang)*8,1)
---	line(80,111,80+13*sin(-tick/10000),111,1)
---	line(80,114,80+13*sin(-tick/12000)+3,114,1)
---	if tick==180 then
---		_update60=_mainupdate
---		_draw=_maindraw
---		tick=0
---		title=cocreate(title_setup)
---	end
---end
+ pal(10,0)
+ sspr(0,90,128,49,0,90)
+ pal()
+ 
+ color(1)
+	line(38,90,0,0)
+	line(39,90,3,0)
+	line(89,90,128,0)
+	line(88,90,125,0)
+
+	color(7)
+	if zoom⧗>120 then
+		cprint("pilot notes:",64,24,7)
+	end
+--	if zoom⧗==150 then sfx(39) end
+	if zoom⧗>150 then
+		
+		cprint("\"".."booyah".."\"",64,30,6)
+	end
+	
+	if zoom⧗>360 then
+		cprint("endless mode ➡️",64,64,13)
+		cprint("⬅️ titlescreen",64,70,13)
+
+	 if btnp(➡️) then
+			wipe=cocreate(wipe_anim)
+			state="wipe"
+	 	_draw=_maindraw
+	 end
+	 
+	 if btnp(⬅️) then
+			state="title"
+			title=cocreate(title_setup)
+			_draw=_maindraw		 	
+	 end
+ end 
+end
 -->8
 --player
 
@@ -2175,21 +2174,21 @@ aaaaaaeaaaaaaeaaaaaaeaaaaaaeaaaa00000000000000e000000000eaaaaaae0000000087777800
 00000000000000000000000011a1a1a1a1a1a1aaa1aaaaaaaaaaaaa1aaaaaaaa1aaaaaaaa1aaaa1111111111111111111a1a1a11000000000000000000000000
 000000000000000000000000111a1a1a1a1a1a1a1a1aa1a1a1aaa1a1aaaa111111111aaaa1aa1a1aaaaaaaaaaaaaaaaa11a1a111000000000000000000000000
 00000000000000000000000011a1a1a1a1a1111111a1aa1aaaaaaaa1aaaaaaaa1aaaaaaaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a11000000000000000000000000
-0000000000000000000000001a111a11111aaa1aaa11a1a1a1a1a1a1aaaaaaaa1aaaaaaaa11a1a1aaaaaaaaaaaaaaaaa11a11111000000000000000000000000
-00000000000000000000000011a1a1a11aaaaa1aaaaa1aaaaaaaaaa1aaa1aaaa1aaaa1aaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a11000000000000000000000000
-0000000000000000000000001a1a1a11aaaaaa1aaaaaa1a1a1a1aaa1aaa1aaaa1aaaa1aaa11aaa1aaaaaaaaaaaaaaaaa11a1a1a1000000000000000000000000
-00000000000000000000000111a1a1a1aaaaaa1aaaaaa1aaaaaaaaa1aaa111aaaaa111aaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a11100000000000000000000000
-000000000000000000000011111a111aaaaaaa1aaaaaaa11a1a1a1a1aaaaaaaaaaaaaaaaa11a1a1aaaaaaaaaaaaaaaaa1111a111a10000000000000000000000
-0000000000000000000001a1a1a1a11aaaaaaa1aaaaaaa1aaaaaaaa1aaaaaaaaaaaaaaaaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a1a1a1000000000000000000000
-000000000000000000001a1a111a1a1aaaaaaa1aaaaaaa11a1a1a1a1aaaaaaaaaaaaaaaaa1aa1a11111111111111111111a1a111a11100000000000000000000
+0000000000000000000000001a111a11111aaa1aaa11a1a1a1a1a1a1aaaaaaaa1aaaaaaaa11a1a11111111111a1aaaaa11a11111000000000000000000000000
+00000000000000000000000011a1a1a11aaaaa1aaaa11aaaaaaaaaa1aaa1aaaa1aaaa1aaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a11000000000000000000000000
+0000000000000000000000001a1a1a11aaaaaa1aaa11a1a1a1a1aaa1aaa1aaaa1aaaa1aaa11aaa1aaaaaaaaaaaaaaaaa11a1a1a1000000000000000000000000
+00000000000000000000000111a1a1a1aaaaaa1aa11aa1aaaaaaaaa1aaa111aaaaa111aaa1aaaa111111111111a1a1aa1a1a1a11100000000000000000000000
+000000000000000000000011111a111aaaaaaa1a11aaaa11a1a1a1a1aaaaaaaaaaaaaaaaa11a1a1aaaaaaaaaaaaaaaaa1111a111a10000000000000000000000
+0000000000000000000001a1a1a1a11aaaaaaa111aaaaa1aaaaaaaa1aaaaaaaaaaaaaaaaa1aaaa1aaaaaaaaaaaaaaaaa1a1a1a1a1a1000000000000000000000
+000000000000000000001a1a111a1a1aaaaaaa11aaaaaa11a1a1a1a1aaaaaaaaaaaaaaaaa1aa1a11111111111111111111a1a111a11100000000000000000000
 00000000000000000001aa11a1a1a111111111111111111aaaaaaaa1111111111111111111aaaaaaa1aaa1aa1a1a1a1a1a1a1a1a1a1a10000000000000000000
 0000000000000000001a1a11a1a1a11aaaaaaa1aaaaaaa1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1aa1aaa1a1a1a1a1a1a1a11a1000000000000000000
-000000000000000001a111a11a1a1a1aaaaaaa1aaaaaaa11a1a1a1aaaaaaaaaaaaaaaaaaaaaa1a1a1a1a1aa1a1a1a1a1a1a1a1a111a11a100000000000000000
-00000000000000001a1a1a11a1a1a11aaaaaaa1aaaaaaa1a1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1aaa1aa1a1a1a1a1a1a1a1a1a1a11a1a10000000000000000
-000000000000000111111111111a1111aaaaaa1aaaaaa1a1a1a1a1aaaaaaaaaaaaaaaaaaaa1a1a1a1a1a1aa1a1a1a1a1a111a111111111111000000000000000
-000000000000001a1a1a1a11a1a1a1a1aaaaaa1aaaaaa1aa1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1aaa1aa1aaa1a1a1a1a1a1a1a1a11a1a1a100000000000000
-00000000000001111111111a111a111a1aaaaa1aaaaa11a1a1a1a1aaaaaaaaaaaaaaaaaaaa1a1a1a1a1a1aa1a1a1a1a1a111a111a11111111110000000000000
-0000000000001a111a111a11a1a1a1a1a11aaa1aaa111a1aaa1aaa1aaa1aaaaaaaaaa1aaa1aaa1aaa1a1a11a1a1a1a1a1a1a1a1a1a11a111a1a1000000000000
+000000000000000001a111a11a1a1a1aaaaaaa1aaaaaaa11a1a1a1a111a1aaa111aa11a111aa1a1a1a1a1aa1a1a1a1a1a1a1a1a111a11a100000000000000000
+00000000000000001a1a1a11a1a1a11aaaaaaa1aaaaaaa1a1aaaaaa1a1a1aaa1a1a1aaaa1aaaaaa1aaa1aa1a1a1a1a1a1a1a1a1a1a11a1a10000000000000000
+000000000000000111111111111a1111aaaaaa1aaaaaa1a1a1a1a1a11aa1aaa111a111aa1a1a1a1a1a1a1aa1a1a1a1a1a111a111111111111000000000000000
+000000000000001a1a1a1a11a1a1a1a1aaaaaa1aaaaaa1aa1aaaaaa1a1a1aaa1a1aaa1aa1aaaaaa1aaa1aa1aaa1a1a1a1a1a1a1a1a11a1a1a100000000000000
+00000000000001111111111a111a111a1aaaaa1aaaaa11a1a1a1a1a111a111a1a1a11aaa1a1a1a1a1a1a1aa1a1a1a1a1a111a111a11111111110000000000000
+0000000000001a111a111a11a1a1a1a1a11aaa1aaa111a1aaa1aaaaaaaaaaaaaaaaaaaaaaaaaa1aaa1a1a11a1a1a1a1a1a1a1a1a1a11a111a1a1000000000000
 00000000000111111111111111111a111a111111111aa1a1a1a1a1a1a1a1a1a1aa1a1a1a1a1a1a1a1a1a1aa1a1a111a111a11111111111111111100000000000
 00000000000111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111100000000000
 __label__
@@ -2357,7 +2356,7 @@ __sfx__
 011000000944009440094400944006440064400544005440094400944209442094400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01080000000000010300103001030010318113171131612315123121330d133061430214301153001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103
 01100000034400344003440034400344003440054400544006440064400644006440094400944009440094400a4400a4400a4400a4400a4400a4400a4400a4400840008400084000840006400064000640006400
-010800200c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c0000c000
+011000001c0301d0301c03019030190301903019030190300c0000c0000c0000c0002406024060250602506024060240602206022060220602206022060220600c0000c0000c0000c0000c0000c0000c0000c000
 0110000000500005003750000500005000050030500005000050000500005000050000500005003a500375000050000500005000000000000005003c5002e50000500005003c50000500005003a5003f50000000
 01100000000000000024500295002b5002e500000000000037500000003c5000000000000000000000000000000003f5002250000000000000000000000000003f500000002450000000000003f5003050000000
 000800200c0100c0100c0100c0100c0100c0100c0100c0200c0200c0200c0200c0200c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0200c0200c0200c010
