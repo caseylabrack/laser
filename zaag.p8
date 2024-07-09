@@ -13,6 +13,7 @@ __lua__
 -- deepest high score
 -- test repulsive force for seekers
 -- palette bug?
+-- token optimization: multiline cprint?
 
 --😐:
 -- unique death animations
@@ -141,9 +142,9 @@ function _init()
 	end
 
 	_update60=_mainupdate
---	_draw=_maindraw
-			_draw=_outro
---	slides()
+	_draw=_maindraw
+--			_draw=_outro
+	slides()
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 --	menuitem(2, "save screenshot", function () extcmd("screen") end)
@@ -178,16 +179,12 @@ end
 --function _update60()
 function _mainupdate()
 
---if btn(🅾️) then
---	_update60 = nil
---	slides()
---end
-
 tick+=1
 
 -- pause for boss theme reprise
---if stat(46)==33 and extralives==2 then
-if stat(54)==5 or stat(54)==6 then
+if stat(49)==33 then
+	local pct=1-stat(53)/26
+	boss.detht=mid(0,pct,1)	
 	return
 end
 
@@ -232,9 +229,9 @@ pthrusting=thrust
 for f in all(fs) do
 	f.tick+=1
 	for l in all(f) do --each leaf
-	for p in all(ps) do
-		if p.enabled and touching(p,l) then died(p,l) end
-	end
+		for p in all(ps) do
+			if p.enabled and touching(p,l) then died(p,l) end
+		end
 		l.growcount+=1
 		if l.growcount>f.growgoal and l.r<12 then --grow
 			if not touching(l,inner) then
@@ -244,10 +241,13 @@ for f in all(fs) do
 		end
 	end
 	--bud
-	if f.tick%f.br==0
---	and #f<f.max
-	then
-		local couldbuds=filter(function(x) return x.r>=12 end, f)
+	if f.tick%f.br==0 then
+		local couldbuds={}
+		for _,fl in ipairs(f) do
+			if fl.r>=12 then
+				add(couldbuds,fl)
+			end
+		end
 		if #couldbuds>0 then
 			local k,ang,colliding,i,l={},0,true,0,{}
 			while colliding and i<100 do
@@ -857,7 +857,6 @@ function makelvl()
 	lvls.nosafezone=nil
 	--special levels override
 	if lvl==0 then lvls={flowers=1} end
---	lvl=12
 	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
 end
 
@@ -954,10 +953,6 @@ function spawn()
 			end
 			if unit=="boss" then
 				boss:spawn()
---				sfx(38)
---				music(8)
---				sfx(33)
---					music(5)
 				break
 			end
 			c=i
@@ -966,16 +961,14 @@ function spawn()
 		end
 	end
 	c=i
---	if lvl==12 then music(5) end
---	if lvl==12 then sfx(33,0) end
+	-- boss theme reprise
+	if lvl==12 then sfx(33,3) end
 	while c>0 do c-=1 yield() end
 	state="running"
 	extcmd("rec")
 end
 
 function death(delay)
-	music(-1,100)
-	yield()
 	while delay>0 do
 		delay-=1
 		yield()
@@ -1027,7 +1020,7 @@ function gameover()
 		sspr(20,40,107,16,10,46)
 
 		--print each line of the tip
-		local ytext=54+18
+		local ytext=72
 		for i=1,#tip do
 			local msg=tip[i]
 			if i==1 then msg="tip: "..msg end
@@ -1092,67 +1085,7 @@ function gamewin_anim()
 	
 	clearlevel()
 	ps[1].enabled,ps[2].enabled=false,false
-	_draw=_outro
-	
- 
---	i=120
---	while i>0 do --fade out
---		local pct=1-i/120
---		cp=bwp[ceil(pct*#bwp)]
---		i-=1
---		yield()
---	end
---	clearlevel()
---	inner.enabled=false
---	ps[1].enabled,ps[2].enabled=false,false
-
---	local msg=rnd({"2 ez","gottem","booyah."})
---	local msg=rnd(split"gOTTEM,bOOYAH,2 EZ.")
---	i,cp=180,dp
---	sfx(39)
---	
-	
---	local loop=true
---	local continue=false
---	while loop do
---	while i>0 or (btn()==0 or btn()>3) do --fade back in, then exit with anykey
---		local pct=i/180
---		cp=bwp[ceil(pct*#bwp)]
---		i-=1
-
---		local ypos=62
-
-		--endless mode
---		if btnp(➡️) then
---			continue=true
---			loop=false
---		end
---		
---		--titlescreen
---		if btnp(⬅️) then
---			continue=false
---			loop=false
---		end
-
---		cprint("every tau immaculate!", 64,30,7)
---		cprint("pilot notes:",64,54,7)
---		cprint("\""..msg.."\"",64,62,6)
---
---		cprint("time: "..final_time,64,84,13)
-
-		
-	 
---		yield()
---	end
---	ps[1].enabled,ps[2].enabled=false,false
---	
---	if continue then
---		wipe=cocreate(wipe_anim)
---		state="wipe"
---	else 
---		state="title"
---		title=cocreate(title_setup)		
---	end
+	_draw=_outro 
 end
 
 function clearlevel()
@@ -1193,23 +1126,6 @@ end
 function sad (a1,a2)
 	a1,a2=a1*360,a2*360
 	return (a2 - a1 + 540) % 360 - 180
-end
-
---what array elements satisfy predicate function?
-function filter(f,t)
-	local r={}
-	for _,v in ipairs(t) do
-		if f(v) then add(r,v) end
-	end
-	return r
-end
-
---do all array elements satisfy predicate function?
-function allt(f,t)
-	for _,v in ipairs(t) do
-		if not f(v) then return false end
-	end
-	return true
 end
 
 --easings.net
@@ -1468,6 +1384,7 @@ function _outro ()
 	zoom⧗+=1
 			
 	if zoom⧗%60==0 then
+--		sfx(35,1)	
 		add(zooms,{r=1,p=rnd()})
 	end
 		
@@ -1477,12 +1394,14 @@ function _outro ()
 		return
 	end
 
-	if zoom⧗==60 then sfx(34,0) end
+	if zoom⧗==60 then sfx(34) end
 
  for z=#zooms,1,-1 do
  	zooms[z].r*=1.05
 		zooms[z].p+=.005
-		if zooms[z].r>84 then deli(zooms,z) end
+		if zooms[z].r>84 then 
+			deli(zooms,z) 
+		end
  	local sx=64+cos(zooms[z].p)*15
  	local sy=64+sin(zooms[z].p)*15
  	circfill(sx,sy,zooms[z].r, 0 | 0x1800)
@@ -1490,10 +1409,11 @@ function _outro ()
  end
 
 	cprint("pilot notes:",64,24,7)
-	if stat(50)>12 or stat(46)==-1 then
+	if stat(50)>12 or stat(50)==-1 then
  	cprint("\"BOOYAH\"",64,30,6)
 	end
 
+--	camera(0,sin(t()))
  pal(10,0)
  sspr(0,90,128,49,0,90)
  pal()
@@ -1503,6 +1423,7 @@ function _outro ()
 	line(39,90,3,0)
 	line(89,90,128,0)
 	line(88,90,125,0)
+--	camera()
 
 	if zoom⧗>360 then
 		cprint("endless mode ➡️",64,64,13)
@@ -1957,7 +1878,7 @@ end,
 spawn=function(_ENV)
 	enabled,bulges=true,{}
 	x,y,r,hp=64,64,10,10--360
-	state,start,detht="spawn",0,0
+	state,start,detht="spawn",0,1
 end,
 },{__index=_ENV})
 
@@ -2350,12 +2271,12 @@ __sfx__
 001000000000000000000000000000000000000000000000114701147211472114700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 011000000944009440094400944006440064400544005440094400944209442094400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01080000000000010300103001030010318113171131612315123121330d133061430214301153001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103
-01100000034400344003440034400344003440054400544006440064400644006440094400944009440094400a4400a4400a4400a4400a4400a4400a4400a4400840008400084000840006400064000640006400
+011000000a4400a4400a4400a440034400344003440034400344003440054400544006440064400644006440094400944009440094400a4400a4400a4400a4400a4400a4400a4400a44008400084000840008400
 011000001c0301d0301c03019030190301903019030190300c0000c0000c0000c0002406024060250602506024060240602206022060220602206022060220600c0000c0000c0000c0000c0000c0000c0000c000
-0110000000500005003750000500005000050030500005000050000500005000050000500005003a500375000050000500005000000000000005003c5002e50000500005003c50000500005003a5003f50000000
+010400000371003710037200372003720037100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01100000000000000024500295002b5002e500000000000037500000003c5000000000000000000000000000000003f5002250000000000000000000000000003f500000002450000000000003f5003050000000
 000800200c0100c0100c0100c0100c0100c0100c0100c0200c0200c0200c0200c0200c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0300c0200c0200c0200c010
-01080000120500c0500c0500c05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00080000120500c0500c0500c05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01100000180201e0201f0201f0201f020270003c00037000350003500033000300002e0002b00029000290002700027000240002400022000220001f0001d0001d0001b0001b0001b0001b000000000000000000
 010a000030624306242e6242e6242e6242b6242b6242962429624246242262422624226241b6241b6241b6241b6241b6241b6241662413624136241362413624136240c6240c6240c6240c6240a6240a62405624
 010800000f05009050090500905000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
