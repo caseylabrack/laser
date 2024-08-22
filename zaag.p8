@@ -26,6 +26,8 @@ __lua__
 -- intro: a skill based video skill program
 --  for one or two players
 
+debug=false
+
 version=53
 _g=_ENV
 laserspeeds={.0025,.002,.0015}
@@ -355,7 +357,19 @@ for z in all(zs) do
 end
 
 --homing bomb move
-for h in all(hs) do
+for i=1,#hs do --collisions
+	for j=i+1,#hs do		
+		if touching(hs[i],hs[j],12) then
+			local ang=atan2(hs[i].x-hs[j].x,hs[i].y-hs[j].y)
+			hs[i].x+=cos(ang)
+			hs[i].y+=sin(ang)
+			hs[j].x-=cos(ang)
+			hs[j].y-=sin(ang)					
+		end		
+	end
+end
+
+for h in all(hs) do	
 	h:update()
 end
 
@@ -386,7 +400,7 @@ for p in all(ps) do
 		--player vs. homing bombs
 		for h in all(hs) do
 			if touching(p,h) then
-				died(p,h)
+--				died(p,h)
 			end
 		end
 
@@ -858,6 +872,7 @@ function makelvl()
 	--special levels override
 	if lvl==0 then lvls={flowers=1} end
 	if lvl==12 then lvls={boss=1,lasers=3,safezone=1} end
+	lvls={bomb=3,flowers=1}
 end
 
 function spawn()
@@ -1110,8 +1125,8 @@ function distt(t1,t2)
 end
 
 --circle/circle intersection
-function touching(a,b)
-	return distt(a,b)<a.r+b.r
+function touching(a,b,margin)
+	return distt(a,b)<a.r+b.r+(margin or 0)
 end
 
 function deflect(v,a)
@@ -1232,7 +1247,7 @@ bwp={ --fade to black
 
 function slides()
 
-	music(0)
+	if not debug then music(0) end
 	local pat=0  --this iter music pattern
 	local lpat=0 --pattern last iter
 	local pat⧗=0 --ticks this pattern
@@ -1703,7 +1718,7 @@ function title_setup()
 	end
 	yield()
 
-	while true do
+	while true and not debug do
 		title⧗+=1
 --give the bomb something to chase
 		if rnd()>.95 then
@@ -1727,12 +1742,12 @@ function title_setup()
 
 		print("2p join"..(ps[2].playing and "!" or "?"),
 			96,0,ps[2].playing and 12 or 1)
-
-		color(1)
-		print("cASEY",108,117)
-		print("lABRACK",100,122)
-
-		print("V."..version,1,122)
+--
+--		color(1)
+--		print("cASEY",108,117)
+--		print("lABRACK",100,122)
+--
+--		print("V."..version,1,122)
 		yield()
 	end
 	
@@ -1743,8 +1758,8 @@ function title_setup()
 
 -- play tau 0 if noob or on practice difficulty
 --	if dget(3)==0 then lvl=0 else lvl=1 end
---	lvl=0
-	lvl=12
+	lvl=0
+--	lvl=12
 
 	tick=0
 	makelvl()
@@ -1931,7 +1946,7 @@ function newbomb()
 				if d<sight then
 					if state~="chase" and not muted then sfx(9) end
 					state="chase"
-					local a=atan2(target.x-x+rnd(4)-2,target.y-y+rnd(4)-2)
+					local a=atan2(target.x-x,target.y-y)					
 					dx+=cos(a)*t dy+=sin(a)*t
 					frametick+=1
 				else
