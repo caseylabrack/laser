@@ -6,7 +6,6 @@ __lua__
 
 --todo:
 -- deepest high score
--- return to briefing from title
 -- token optimization: multiline cprint?
 
 --😐:
@@ -30,9 +29,8 @@ ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
 inner,outer_r={x=64,y=64,r=6,enabled=true},63
 mulligans=2
 extralives=mulligans
-tick,state=0,"title"
 cp=dp--current pallete
-sleep,shake=0,0
+tick,sleep,shake=0,0,0
 pthrusting=false --was anybody making the thrust noise last frame?
 --seconds,minutes=0,0
 
@@ -95,59 +93,9 @@ function _init()
 	screenshake=dget(4)==0
 	difficulty=difficulty==0 and 1 or difficulty
 	initplayers()
-
-	-- bullets init
-	for i=1,2 do
-		add(bs,
-		setmetatable({
-			x=0,y=0,a=0,dx=0,dy=0,enabled=false,
-			r=2,speed=2.5,parts={},id=i-1,
-			splash=function(_ENV)
-				for i=1,10 do
-					local ps={}
-					ps.x,ps.y=x,y
-					local d,ang=rnd(2),rndr(-.2,.2)
-					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(12)
-					add(parts,ps)
-				end
-				enabled=false
-				sfx(44,-2)
-			end,
-
-			doparticles=function(_ENV)
-				for bp in all(parts) do
-					bp.t-=1
-					bp.x+=bp.dx or 0
-					bp.y+=bp.dy or 0
-					if bp.t<0 then
-						del(parts,bp)
-					end
-				end
-			end,
-
-			render=function(_ENV)
---				if not enabled then return end
-				if enabled then
-					line(x,y,x-dx,y-dy,12)
-				end
-				for p in all(parts) do
-					pset(p.x,p.y,12)
-				end
-			end,
-		},{__index=_ENV}))
-	end
+	initbullets()
 	
-	
-	
-	state="intro"
 	doslides()
-
---	_update60=function () end --_mainupdate
---	_draw=_maindraw
---			_draw=_outro
---	slides()
---	doslides()
---	_draw=introdraw
 
 --	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
 --	menuitem(2, "save screenshot", function () extcmd("screen") end)
@@ -156,34 +104,24 @@ function _init()
 end
 
 function _update60()
-	
-	if state=="intro" then
-	
-	elseif state=="title" then
-		if btnp(❎) then
-			lvl=0
-			makelvl()
-			extralives=mulligans
-			state="wipe"
-			wipe=cocreate(wipe_anim)
+	if state~="intro" then
+		if state=="title" then
+			_titleupdate()
 		end
-		if btnp(⬅️) then
-			sfx(37,-2)
-			doslides()
-			state="intro"
-		end
---		_mainupdate()
-	else
 		_mainupdate()
-	end
-	
+	end	
 end
 
 function _draw()
 	if state=="intro" then
 		_introdraw()
+	elseif state=="outro" then
+		_outrodraw()
 	else
 		_maindraw()
+		if state=="title" then
+			_titledraw()
+		end
 	end
 end
 
@@ -211,7 +149,6 @@ end
 --	return true
 --end
 
---function _update60()
 function _mainupdate()
 
 tick+=1
@@ -222,28 +159,6 @@ if stat(49)==33 then
 	boss.detht=mid(0,pct,1)	
 	return
 end
-
---if state=="title" then
---	if btnp(❎) then
---		lvl=0
---		makelvl()
---		extralives=mulligans
---		state="wipe"
---		wipe=cocreate(wipe_anim)
---	end
---	if btnp(⬅️) then
---		doslides()
---		state="intro"
---	end
---end
-
---if tick%60==0 then
---	seconds+=1
---	if seconds%60==0 then
---		seconds=0
---		minutes+=1
---	end
---end
 
 -- do animations
 for a in all(as) do
@@ -398,7 +313,6 @@ for z in all(zs) do
 			z.x,z.y=64+cos(z.a)*63,64+sin(z.a)*63
 		else
 			z.t,z.state=32,"idle"
---			z.state="idle"
 		end
 	end
 end
@@ -1063,8 +977,9 @@ function death(delay)
 		del(a2,gameoveranimation)
 		lvl=1
 		extralives=2
-		state="title"
-		title=cocreate(title_setup)
+		dotitle()
+--		state="title"
+--		title=cocreate(title_setup)
 	else
 		del(a2,dethmsg)
 		state="setup"
@@ -1143,12 +1058,12 @@ function gamewin_anim()
 	
 	clearlevel()
 	ps[1].enabled,ps[2].enabled=false,false
-	_draw=_outro 
+--	_draw=_outro
+	dooutro() 
 end
 
 function clearlevel()
 		lz,zs,hs,rs,fs={},{},{},{},{}
---		lz,zs,h.enabled,rs,fs={},{},false,{},{}
 		for b in all(bs) do
 			b.enabled=false b.parts={}
 		end
@@ -1289,6 +1204,7 @@ bwp={ --fade to black
 --intro and outro
 
 function doslides()
+	state="intro"
 	music(-1)
 	if not debug then music(0) end
 	pat=0  --this iter music pattern
@@ -1298,8 +1214,6 @@ function doslides()
 	hidepal=split("13,13,13,13,13,13,13,13,13,13,13,13,13,13,13")
 	skipcount=0 --skip button
 	nanos=0 --scale to display	
-
---	_draw=_introdraw
 end
 
 function _introdraw()
@@ -1307,10 +1221,7 @@ function _introdraw()
 	pat=stat(54)
 	
 	if pat==-1 then
-		setuptitle()
-		state="title"
---		_update60=_mainupdate
---		_draw=_maindraw
+		dotitle()
 	end
 	
 	if lpat==pat then 
@@ -1319,20 +1230,22 @@ function _introdraw()
 	 pat⧗=0
 	end
 	
-	if btn(➡️) then
-		skipcount+=1
-		if skipcount>30 then
-			music(-1)
+	if btn()~=0 then
+		if btn(➡️) then
+			skipcount+=1
+			if skipcount>30 then
+				music(-1)
+			end
+		else
+			skipcount=0
 		end
-	else
-		skipcount=0
+
+		print("➡️ TO SKIP",89,120,13)
+		clip(89,120,39*skipcount/30,8)
+		print("➡️ TO SKIP",89,120,7)
+		clip()
 	end
-	
-	print("➡️ TO SKIP",89,120,13)
-	clip(89,120,39*skipcount/30,8)
-	print("➡️ TO SKIP",89,120,7)
-	clip()
-	
+		
 	local text=""
 
 	if pat==0 then
@@ -1441,157 +1354,14 @@ there's no time to disable them
 	lpat=pat
 end
 
---function slides()
---
---	if not debug then music(0) end
---	local pat=0  --this iter music pattern
---	local lpat=0 --pattern last iter
---	local pat⧗=0 --ticks this pattern
---	--palette to hide/reveal art
---	local hidepal=split("13,13,13,13,13,13,13,13,13,13,13,13,13,13,13")
---	local skipcount=0 --skip button
---	local nanos=0 --scale to display
---	
---	while pat~=-1 do
---		cls()
---		pat=stat(54)
---		
---		if lpat==pat then 
---			pat⧗+=1 
---		else
---		 pat⧗=0
---		end
---		
---		if btn(➡️) then
---			skipcount+=1
---			if skipcount>30 then
---				music(-1)
---			end
---		else
---			skipcount=0
---		end
---		
---		print("➡️ TO SKIP",89,120,13)
---		clip(89,120,39*skipcount/30,8)
---		print("➡️ TO SKIP",89,120,7)
---		clip()
---		
---		local text=""
---
---		if pat==0 then
---			--% of pattern 0
---			local pct=easeinexpo(stat(50)/31)
---			
-----			local ratio=3.7353--127/34
---			
-----			--start size
-----			local mwid=ratio*4
-----			local mhid=4
-----			--final size
-----			local fwid=127
-----			local fhid=34
-----			--diffs
-----			dwid=fwid-mwid
-----			dhid=fhid-mhid		
-----			--width/height this frame
-----			local wid=mwid+dwid*pct
-----			local hid=mhid+dhid*pct
-----			--number of rects
-----			local rs=100
-----			--total (whole grid)
-----			local twid=wid*(rs+1)
-----			local thid=hid*(rs+1)
---	
---			--hardcoded values for above
---			local wid=14.9412+112.0588*pct
---			local hid=4+30*pct
---			
---			clip(0,13,127,34)
---			camera(wid*(101)/2-64,hid*(101)/2-64)
---			for row=0,101 do
---				for col=0,101 do
---					rect(
---						col*wid,
---						row*hid-34,
---						col*wid+wid,
---						row*hid+hid-34,
---						13
---					)
---				end
---			end
---			camera()
---			clip()
---			text=
---[[welcome to the tau clusters.]]
---			nanos=flr(9/pct)
---		end
---
---		--ship reveal
---		if mid(pat,1,2)==pat then
---			hidepal[7],hidepal[1]=7,9
---			text=
---[[your craft is manueverable,
---armed, and most importantly,
---disposable.
---
---you'll get only 2 spares per tau
---(for insurance reasons).
---]]			
---		end
---		--zoids reveal
---		if mid(pat,3,4)==pat then
---			hidepal[9]=nil hidepal[11]=nil hidepal[14]=nil hidepal[8]=nil
---			text=
---[[the threat: zaagella flora. 
---it spreads from beneath tau 1.
---
---your blaster cuts through zaag,
---but only fires one-at-a-time
---(regulatory requirement).
---]]			
---		end
---		--defenses reveal
---		if mid(pat,5,6)==pat then
---			hidepal[10]=8 hidepal[6]=nil hidepal[12]=14
---			text=
---[[automated defenses are useless
-----against them. 
---
---there's no time to disable them 
---(requires 2 business-days).
---
---]]
---		end
---		
---		if pat==6 then
---			text=text.."good luck!"
---		end
---		rect(0,47-34,127,81-34,6)
---		print("NANOMETERS: "..nanos,1,49,13)
---		pal(hidepal)
---		--126 width x 34 height
---		if pat>0 then
---			sspr(0,56,126,34,1,47-34)
---		end
---		pal()
---		cprint("…briefing…",64,0,13)
---		color(6)
---		if pat⧗<3 
---			and (pat==0 or pat==1 or pat==3 or pat==5) then
---			color(13)	
---		end 
---		print(text,1,65)
---		lpat=pat
---		flip()
---	end
---	setuptitle()
-----	title=cocreate(title_setup)
---end
 
-local zooms={}
-local zoom⧗=0
+function dooutro()
+ zooms={}
+ zoom⧗=0
+ state="outro"	
+end
 
-function _outro ()
+function _outrodraw ()
 
 	zoom⧗+=1
 			
@@ -1644,13 +1414,10 @@ function _outro ()
 	 if btnp(➡️) then
 			wipe=cocreate(wipe_anim)
 			state="wipe"
-	 	_draw=_maindraw
 	 end
 	 
 	 if btnp(⬅️) then
-			state="title"
-			title=cocreate(title_setup)
-			_draw=_maindraw		 	
+	 	dotitle()
 	 end
  end 
 end
@@ -1879,9 +1646,54 @@ function closestplayer(t)
 	if not ps[1].enabled then return ps[2] end
 	return distt(t,ps[1])<distt(t,ps[2]) and ps[1] or ps[2]
 end
+
+function initbullets()
+		-- bullets init
+	for i=1,2 do
+		add(bs,
+		setmetatable({
+			x=0,y=0,a=0,dx=0,dy=0,enabled=false,
+			r=2,speed=2.5,parts={},id=i-1,
+			splash=function(_ENV)
+				for i=1,10 do
+					local ps={}
+					ps.x,ps.y=x,y
+					local d,ang=rnd(2),rndr(-.2,.2)
+					ps.dx,ps.dy,ps.t=cos(a+.5+ang)*d,sin(a+.5+ang)*d,rnd(12)
+					add(parts,ps)
+				end
+				enabled=false
+				sfx(44,-2)
+			end,
+
+			doparticles=function(_ENV)
+				for bp in all(parts) do
+					bp.t-=1
+					bp.x+=bp.dx or 0
+					bp.y+=bp.dy or 0
+					if bp.t<0 then
+						del(parts,bp)
+					end
+				end
+			end,
+
+			render=function(_ENV)
+--				if not enabled then return end
+				if enabled then
+					line(x,y,x-dx,y-dy,12)
+				end
+				for p in all(parts) do
+					pset(p.x,p.y,12)
+				end
+			end,
+		},{__index=_ENV}))
+	end
+end
 -->8
 --titlescreen
-function setuptitle()
+function dotitle()
+	title⧗=0
+	state="title"
 	sfx(37)
 	clearlevel()
 	inner.enabled=true
@@ -1914,91 +1726,55 @@ function setuptitle()
 	end
 end
 
+function _titleupdate()
 
---title screen
---function title_setup()
---	local title⧗=0
---	sfx(37)
---	clearlevel()
---	inner.enabled=true
---	local a=rnd()
---	add(lz,{a=a,x=64+cos(a)*63,y=64+sin(a)*63,speed=.0025,parts={index=0}})
---	h=newbomb()
---	h.muted=true
---	h:spawn()
---	add(hs,h)
---	for i=1,5 do
---		local f={}
---		f.tick,f.max=flr(rnd(100)),12
---		f.growgoal=240 --grow rate
---		f.br=1000 --bud rate
---		local r={}
---		local d,a=12+rnd(63-24),rnd()
---		r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
---		r.growcount=rnd(f.growgoal) r.hit=-100
---		add(f,r)
---		add(fs,f)
---	end
---	local z=flr(rnd(10))+3
---	for i=1,z do
---		local r,a,d={},rnd(),rnd(64-24)+12
---		r.x,r.y=64+cos(a)*d,64+sin(a)*d
---		local a2,spd=rnd(),(rnd(1.25)+.5)/2
---		r.dx,r.dy=cos(a2)*spd,sin(a2)*spd
---		r.r,r.enabled,r.hit=3+rnd(8-3),true,-10
---		add(rs,r)
---	end
---	yield()
+	title⧗+=1
+	
+	if title⧗>60 then
+		if btnp(➡️) then
+			sfx(37,-2)
+			lvl=12
+			makelvl()
+			extralives=mulligans
+			state="wipe"
+			wipe=cocreate(wipe_anim)
+		end
+		if btnp(⬅️) then
+			sfx(37,-2)
+			doslides()
+		end		
+	end
+
+	if btnp()>255 then
+		ps[2].playing=not ps[2].playing
+	end
+end
+
+function _titledraw()
+
+		if rnd()>.95 then
+			ps[1].x,ps[1].y=rnd(128),rnd(128)
+		end
+
+		pal(7,0)
+		sspr(65,0,51,39,39,18)
+		pal()
+		
+		print("2p join"..(ps[2].playing and "!" or "?"),
+			96,0,ps[2].playing and 12 or 1)
+
+		if title⧗>60 then
+--			print("  ➡️ play\n⬅️ briefing",43,110,title⧗>64 and 1 or 12)
+			print("  ➡️ play\n⬅️ briefing",43,110,13)
+		end
+		
+--		color(1)
+--		print("cASEY",108,117)
+--		print("lABRACK",100,122)
 --
---	while true and not debug do
---		title⧗+=1
-----give the bomb something to chase
---		if rnd()>.95 then
---			ps[1].x,ps[1].y=rnd(128),rnd(128)
---		end
---
---		pal(7,0)
---		sspr(65,0,51,39,39,18)
---		pal()
---
---		--p2 controller button press detect
---		--for p2 join
---		if btnp()>255 then
---			ps[2].playing=not ps[2].playing
---		end
---
---		if title⧗>60 then cprint("press ❎",64,114,1) end
---		if title⧗>60 and btnp(❎,0) then
---			break
---		end
---
---		print("2p join"..(ps[2].playing and "!" or "?"),
---			96,0,ps[2].playing and 12 or 1)
-----
-----		color(1)
-----		print("cASEY",108,117)
-----		print("lABRACK",100,122)
-----
-----		print("V."..version,1,122)
---		yield()
---	end
---	
-----	slides()
---	
---	sfx(37,-2)
---	seconds,minutes=0,0
---
----- play tau 0 if noob or on practice difficulty
-----	if dget(3)==0 then lvl=0 else lvl=1 end
---	lvl=0
-----	lvl=12
---
-----	tick=0
---	makelvl()
---	extralives=mulligans
---	state="wipe"
---	wipe=cocreate(wipe_anim)
---end
+--		print("V."..version,1,122)
+
+end
 -->8
 -- enemies
 boss =
@@ -2126,7 +1902,7 @@ end,
 
 spawn=function(_ENV)
 	enabled,bulges=true,{}
-	x,y,r,hp=64,64,10,360
+	x,y,r,lasthit,hp=64,64,10,0,360
 	state,start,detht="spawn",0,1
 end,
 },{__index=_ENV})
