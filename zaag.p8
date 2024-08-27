@@ -6,6 +6,8 @@ __lua__
 
 --todo:
 -- deepest high score
+-- boss fight safe zone isn't paused during reprise?
+-- transition to outro doesn't fade?
 -- token optimization: multiline cprint?
 
 --😐:
@@ -32,13 +34,10 @@ extralives=mulligans
 cp=dp--current pallete
 tick,sleep,shake=0,0,0
 pthrusting=false --was anybody making the thrust noise last frame?
---seconds,minutes=0,0
 
 --properties shared by p1 and p2
 charge,fullcharge,hopfail,hopfailtick=460,460,false,0
-gun=0 gunfull=240 gunfail=false gunfailtick=0
-
---difficulty:1 easy,2 med,3 hard
+gun,gunfull,gunfail=0,240,false gunfailtick=0
 
 --[[coroutines:
   wipe
@@ -366,7 +365,7 @@ for p in all(ps) do
 
 		--player vs. boss
 		if boss.enabled and touching(p,boss.floor) then
-				died(p,boss)
+			died(p,boss)
 		end
 
 		--laser/player collision
@@ -494,7 +493,6 @@ end
 --level win
 if ps[1].enabled or ps[2].enabled then
 	if #rs==0 and #fs==0 and boss.enabled==false and state=="running" then
-		state="wiping"
 		extralives=mulligans
 		ps[1].thrusting,ps[2].thrusting=false,false
 		pthrusting=false
@@ -505,7 +503,6 @@ if ps[1].enabled or ps[2].enabled then
 		makelvl()
 		wipe=cocreate(wipe_anim)
 		state="wipe"
---		music(-1,100)
 	end
 end
 
@@ -525,7 +522,6 @@ end --update
 
 function died(player,cause)
 	if state~="running" then return end
---	sfx(2,-2)
 	sfx(13)
 	shake+=20
 	if player.enabled then
@@ -852,17 +848,7 @@ function spawn()
 			c-=1
 			if c>0 then goto continue end
 			if unit=="roids" then
-				local r={}
-				local a=aim_away(.25,.25)
-				local d=rnd(64-24)+12
-				r.x=64+cos(a)*d r.y=64+sin(a)*d
-				local to_p=atan2(ps[1].x-r.x,ps[1].y-r.y)
-				local a2=aim_away(to_p,.25)
-				local spd=(rnd(1.25)+.5)/2
-				r.dx=cos(a2)*spd r.dy=sin(a2)*spd
-				r.r=3+rnd(8-3) r.enabled=true
-				r.hit=-10
-				add(rs,r)
+				newzoid()
 				sfx(6)
 				if #rs==num then break end
 			end
@@ -887,39 +873,7 @@ function spawn()
 				if #hs==num then break end
 			end
 			if unit=="flowers" then
-				local f={}
-				f.tick,f.max=flr(rnd(10)),4
-				f.growgoal=45 --grow rate
-				f.br=(150+flr(rnd(100)))*2 --bud rate
-				local r={}
-				r.growcount=-rnd(60) r.hit=-100
-				c=0
-				local invalid=true
-				while invalid and c<100 do
-					c+=1
-					invalid=false
-					--spawn far enough from center
-					--so that it can grow to full size
-					--and spawn within bounds obvsly
-					local d=18+rnd(63-18)
-					--away from player
-					local a=aim_away(.25,.25)
-					r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
-					--don't overlap other flora
-					for florasystem in all(fs) do
-						for flora in all(florasystem) do
-							if touching(flora,r) then
-								invalid=true
-								goto continuefloraspawn
-							end
-						end
-					end
-					::continuefloraspawn::
-				end
-				if c!=100 then
-					add(f,r)
-					add(fs,f)
-				end
+				newflora()
 				sfx(8)
 				if #fs==num then break end
 			end
@@ -1704,36 +1658,20 @@ function dotitle()
 	h:spawn()
 	add(hs,h)
 	for i=1,5 do
-		local f={}
-		f.tick,f.max=flr(rnd(100)),12
-		f.growgoal=240 --grow rate
-		f.br=1000 --bud rate
-		local r={}
-		local d,a=12+rnd(63-24),rnd()
-		r.x=64+cos(a)*d r.y=64+sin(a)*d r.r=9
-		r.growcount=rnd(f.growgoal) r.hit=-100
-		add(f,r)
-		add(fs,f)
+		newflora()
 	end
-	local z=flr(rnd(10))+3
+	local z=rndr(3,10)
 	for i=1,z do
-		local r,a,d={},rnd(),rnd(64-24)+12
-		r.x,r.y=64+cos(a)*d,64+sin(a)*d
-		local a2,spd=rnd(),(rnd(1.25)+.5)/2
-		r.dx,r.dy=cos(a2)*spd,sin(a2)*spd
-		r.r,r.enabled,r.hit=3+rnd(8-3),true,-10
-		add(rs,r)
+		newzoid()
 	end
 end
 
 function _titleupdate()
-
 	title⧗+=1
-	
 	if title⧗>60 then
 		if btnp(➡️) then
 			sfx(37,-2)
-			lvl=12
+			lvl=0
 			makelvl()
 			extralives=mulligans
 			state="wipe"
@@ -1773,7 +1711,6 @@ function _titledraw()
 --		print("lABRACK",100,122)
 --
 --		print("V."..version,1,122)
-
 end
 -->8
 -- enemies
@@ -1993,6 +1930,56 @@ function newbomb()
 		},{__index=_ENV})
 end
 
+function newflora()
+	local f={}
+	f.tick,f.max=flr(rnd(10)),4
+	f.growgoal=45 --grow rate
+	f.br=(150+flr(rnd(100)))*2 --bud rate
+	local r={}
+	r.growcount=-rnd(60) r.hit=-100
+	c=0
+	local invalid=true
+	while invalid and c<100 do
+		c+=1
+		invalid=false
+		--spawn far enough from center
+		--so that it can grow to full size
+		--and spawn within bounds obvsly
+		local d=18+rnd(63-18)
+		--away from player
+		local a=aim_away(.25,.25)
+		r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+		--don't overlap other flora
+		for florasystem in all(fs) do
+			for flora in all(florasystem) do
+				if touching(flora,r) then
+					invalid=true
+					goto continuefloraspawn
+				end
+			end
+		end
+		::continuefloraspawn::
+	end
+	if c!=100 then
+		add(f,r)
+		add(fs,f)
+	end
+end
+
+function newzoid()
+	local r={}
+	local a=aim_away(.25,.25)
+	local d=rnd(64-24)+12
+	r.x=64+cos(a)*d r.y=64+sin(a)*d
+	local to_p=atan2(ps[1].x-r.x,ps[1].y-r.y)
+	local a2=aim_away(to_p,.25)
+	local spd=(rnd(1.25)+.5)/2
+	r.dx=cos(a2)*spd r.dy=sin(a2)*spd
+	r.r=3+rnd(8-3) r.enabled=true
+	r.hit=-10
+	add(rs,r)
+end
+
 --misc animations
 function rsplode(x,y,r,dx,dy)
 	local c=0
@@ -2197,11 +2184,11 @@ __label__
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
-06000000000000000000000060600660000000000000000000000000000000000000000000000000000000000000000000006060000000000000000000000006
-06000000000000000000000060606000606066000000606006600660000066606600000066606060000066606060666006606060000000000000000000000006
-06000000000000000000000000006660606060600000606060606000000006006060000066606660000066006660660060000000000000000000000000000006
-06000000000000000000000000000060606060600000666066600060000006006060000060600060000060000060600000600000000000000000000000000006
-06000000000000000000000000006600066060600000666060606600000066606060000060606600000006606600066066000000000000000000000000000006
+06000000000000000000000000000000000000000060606600000000000000000000000000000000006060000000000000000000000000000000000000000006
+06000000000000000000000000000000000000000060606060066066606000666066000000666066606060000000000000000000000000000000000000000006
+06000000000000000000000000000000000000000000006060606006006000660060600000060006000000000000000000000000000000000000000000000006
+06000000000000000000000000000000000000000000006060666006006000600060600000060006000000000000000000000000000000000000000000000006
+06000000000000000000000000000000000000000000006060606066600660066066000000666006000000000000000000000000000000000000000000000006
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
 06000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006
@@ -2260,7 +2247,7 @@ __label__
 00000000000000000000000000000000000000066000000000000000000000000000000000000000000000006600000000000000000000000000000000000000
 00000000000000000000000000000000000000000666000000000000000000000000000000000000000006660000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000666000000000000000000000000000000000006660000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000666600000000000000000000000000066660000070000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000666600000000000000000000000000066660000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000066666600000000000000066666600000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000066666666666666600000000000000000000000000000000000000000000000000000000
 
