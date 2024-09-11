@@ -5,7 +5,8 @@ __lua__
 -- casey labrack
 
 --todo:
-
+---allow rotation during spawn phase?
+---endless mode unlockable
 
 --debug=false--true
 
@@ -23,7 +24,7 @@ pthrusting=false --was anybody making the thrust noise last frame?
 
 --properties shared by p1 and p2
 charge,fullcharge,hopfail,hopfailtick=460,460,false,0
-gun,gunfull,gunfail=0,240,false gunfailtick=0
+gun,gunfull,gunfail,gunfailtick=0,240,false,0
 
 --[[coroutines:
   wipe
@@ -579,12 +580,12 @@ pal(cp)
 --laser
 for l in all(lz) do
 	color(8)
-	line(64,64,l.x,l.y,8)
+	line(64,64,l.x,l.y)
 	if rnd(1)>.1 then
-		circfill(l.x,l.y,rnd(2),8)
+		circfill(l.x,l.y,rnd(2))
 	end
 	for z in all(l.parts) do
-		pset(z.x,z.y,8)
+		pset(z.x,z.y)
 	end
 end
 
@@ -661,7 +662,7 @@ if state=="running" then
 	local pct=min(gun/gunfull,1)
 --	local pct=min(p.gun/p.gunfull,1)
 	local f=gun<gunfull and 1 or 12
-	log=gunfail
+--	log=gunfail
 	if gunfail then
  	f=8
 		gunfail=false
@@ -764,13 +765,16 @@ function makelvl()
 		local canspawn={}
 
 		add(canspawn,"roids")
-		if budget>=sprice["flowers"] then
+--		if budget>=sprice["flowers"] then
+		if budget>=1 then
 			add(canspawn,"flowers")
 		end
-		if budget>=sprice["bomb"] then
+--		if budget>=sprice["bomb"] then
+		if budget>=2 then
 			add(canspawn, "bomb")
 		end
-		if budget>=sprice["lasers"] then
+--		if budget>=sprice["lasers"] then
+		if budget>=3 then
 			if lvls.lasers==nil or lvls.lasers<2 then
 				add(canspawn,"lasers")
 				--double the weight of lasers until there's one
@@ -800,10 +804,7 @@ function spawn()
 	for p in all(ps) do
 		p:spawn()
 	end
-	charge=fullcharge
-	gun=0
-	gunfailtick=0
-	sleep,shake=0,0
+	charge,gun,gunfailtick,sleep,shake=fullcharge,0,0,0,0
 
 	while c>0 do c-=1 yield() end
 	inner.enabled=true
@@ -851,6 +852,7 @@ function spawn()
 			yield()
 		end
 	end
+	--short pause between spawn sounds and boss theme
 	c=10
 	while c>0 do c-=1 yield() end
 	-- boss theme reprise
@@ -942,14 +944,13 @@ end
 
 function deathmsg_anim()
 	local msg=rnd(dethmsgs)
-	local ypos=62
 	while true do
-		cprint("pilot notes:", 64, ypos-8,7)
-		cprint("\""..msg.."\"",64,ypos,6)
+		cprint("pilot notes:", 64, 54,7)
+		cprint("\""..msg.."\"",64,62,6)
 		local mulls=extralives==1 and " spare" or " spares"
 --		local mulls=extralives==1 and " mulligan" or " mulligans"
-		cprint(""..extralives..mulls,64,ypos+24,13)
-		cprint("left this tau",64,ypos+32,13)
+		cprint(""..extralives..mulls,64,86,13)
+		cprint("left this tau",64,94,13)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
 				if tick%20>10 then
@@ -1124,37 +1125,13 @@ function circle(x,y,r,c)
 end
 
 --palettes
-dp={ --default
-[0]=0,1,2,3,
-4,5,6,7,
-8,9,10,11,
-12,13,14,15,
-}
+dp=split("1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0")
+
 bwp={ --fade to black
-	{
-	[0]=0,0,0,6,
-	6,5,6,7,
-	6,6,7,7,
-	6,5,6,7,
-	},
-	{
-	[0]=0,0,0,5,
-	5,0,5,6,
-	5,5,6,6,
-	5,0,5,6,
-	},
-	{
-	[0]=0,0,0,0,
-	0,0,0,5,
-	0,0,5,5,
-	0,0,0,5,
-	},
-	{
-	[0]=0,0,0,0,
-	0,0,0,0,
-	0,0,0,0,
-	0,0,0,0,
-	}
+	split("0,0,6,6,5,6,7,6,6,7,7,6,5,6,7,0"),
+	split("0,0,5,5,0,5,6,5,5,6,6,5,0,5,6,0"),
+	split("0,0,0,0,0,0,5,0,0,5,5,0,0,0,5,0"),
+	split("0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
 }
 
 -->8
