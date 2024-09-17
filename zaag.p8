@@ -728,7 +728,7 @@ end
 
 if title and costatus(title)~="dead" then coresume(title) end
 
---print(log,0,120,7)
+--print(ps[1].dx,0,120,7)
 
 end
 
@@ -1394,7 +1394,7 @@ function initplayers()
 			playing=i==1,id=i-1,--plyrs 0 and 1
 			pcolor=i==1 and 7 or 6,
 			x=80,y=30,dx=0,dy=0,dr=0,
-			a=.75,t=.1,rt=.00375,r=2,
+			a=.75,t=.075,rt=.00375,r=2,
 			hop=30,
 			enabled=false,thrusting=false,
 			deathlines={},deathpnts={},
@@ -1422,6 +1422,13 @@ function initplayers()
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
+					local mag=dist(0,0,dx,dy)
+					if mag>1 then
+						dx=dx/mag
+						dy=dy/mag
+					end
+--					dx=mid(-1,dx,1)
+--					dy=mid(-1,dy,1)
 					if not thrusting then
 						thrusting=true
 					end
@@ -1463,10 +1470,8 @@ function initplayers()
 				end
 				x+=dx
 				y+=dy
---				a+=dr
-				dx*=.92 --apply friction
-				dy*=.92
---				dr*=.65
+				dx*=.97 --apply friction
+				dy*=.97
 			end,
 
 			render=function(_ENV)
