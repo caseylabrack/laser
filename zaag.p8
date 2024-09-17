@@ -5,8 +5,7 @@ __lua__
 -- casey labrack
 
 --todo:
----allow rotation during spawn phase?
----endless mode unlockable
+---tau 12 text can overlap enemy
 
 --debug=false--true
 
@@ -43,6 +42,7 @@ gun,gunfull,gunfail,gunfailtick=0,240,false,0
 --4: screenshake toggle (0 is on, 1 is off)
 --5: highscore
 --6: tutorial
+--7: has unlocked endless
 
 dethmsgs=split(
 [[zIGGED WHEN I SHOULDA ZAAGED
@@ -144,6 +144,11 @@ function screenshake_toggle()
 end
 
 function _mainupdate()
+
+--allow turning during spawn time
+for p in all(ps) do
+	p:steer()
+end
 
 -- pause for boss theme reprise
 if stat(49)==33 then
@@ -481,6 +486,7 @@ end
 
 -- game win
 if boss.enabled and state~="win" and boss.hp<0 then
+	dset(7,1)
 	lvl+=1
 	makelvl()
 	extralives=mulligans
@@ -1393,15 +1399,26 @@ function initplayers()
 			enabled=false,thrusting=false,
 			deathlines={},deathpnts={},
 			spawnticks=0,
-
-			update=function(_ENV)
-				if not enabled then return end
+			
+			steer=function(_ENV)
 				if btn(➡️,id) then
 					dr-=rt
 				end
 				if btn(⬅️,id) then
 					dr+=rt
 				end
+				a+=dr
+				dr*=.65			
+			end,
+
+			update=function(_ENV)
+				if not enabled then return end
+--				if btn(➡️,id) then
+--					dr-=rt
+--				end
+--				if btn(⬅️,id) then
+--					dr+=rt
+--				end
 				if btn(⬆️,id) then
 					dx+=cos(a)*t
 					dy+=sin(a)*t
@@ -1446,10 +1463,10 @@ function initplayers()
 				end
 				x+=dx
 				y+=dy
-				a+=dr
+--				a+=dr
 				dx*=.92 --apply friction
 				dy*=.92
-				dr*=.65
+--				dr*=.65
 			end,
 
 			render=function(_ENV)
@@ -1688,7 +1705,15 @@ function _titleupdate()
 		if btnp(⬅️) then
 			sfx(37,-2)
 			doslides()
-		end		
+		end
+		if btnp(⬇️) and dget(7)==1 then
+			sfx(37,-2)
+			lvl=13
+			makelvl()
+			extralives=mulligans
+			state="wipe"
+			wipe=cocreate(wipe_anim)
+		end
 	end
 
 	if btnp()>255 then
@@ -1710,7 +1735,10 @@ function _titledraw()
 			96,0,ps[2].playing and 12 or 1)
 
 		if title⧗>60 then
-			textshadow("  ➡️ play\n⬅️ briefing",43,110,13)
+			if dget(7)==1 then
+				textshadow("⬇️ endless",45,115,8)	
+			end
+			textshadow("  ➡️ play\n⬅️ briefing",43,100,13)
 		end
 		
 --		color(1)
