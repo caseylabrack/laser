@@ -453,7 +453,7 @@ for b in all(bs) do
 				end
 			end
 			if boss.enabled and touching(boss,b) then
-				boss.hp-=2.5
+				boss.hp-=3
 				boss.lasthit=tick
 				b:splash()
 				sfx(42)
@@ -471,16 +471,15 @@ end
 --level win
 if ps[1].enabled or ps[2].enabled then
 	if #rs==0 and #fs==0 and boss.enabled==false and state=="running" then
-		extralives=mulligans
 		ps[1].thrusting,ps[2].thrusting=false,false
-		pthrusting=false
-		sleep=0
+		pthrusting,sleep=false,0
 		sfx(2,-2)
 		if lvl==2 then dset(3,1) end
 		lvl+=1
 		makelvl()
-		wipe=cocreate(wipe_anim)
-		state="wipe"
+		nextlvl()
+--		wipe=cocreate(wipe_anim)
+--		state="wipe"
 	end
 end
 
@@ -523,6 +522,13 @@ end
 function _maindraw()
 --function _draw()
 cls()
+
+--tau zero instructions
+if lvl==0 and (state=="running" or state=="setup") then
+	textshadow("blast the zoids.\ncleanse the tau.",32,24,13)
+	textshadow("❎ (x): "..(fire_btn==❎ and "shoot" or "tele"),40,86,btn(❎) and 7 or 13)
+	textshadow("🅾️ (z): "..(tele_btn==🅾️ and "tele" or "shoot"),40,94,btn(🅾️) and 7 or 13)
+end
 
 camera()
 if sleep<=0 then --hitstop, then shake
@@ -627,13 +633,6 @@ end
 --safezone bot
 for z in all(zs) do
 	spr(5,z.x-4,z.y-4)
-end
-
---tau zero instructions
-if lvl==0 and (state=="running" or state=="setup") then
-	textshadow("blast the zoids.\ncleanse the tau.",32,24,13)
-	textshadow("❎ (x): "..(fire_btn==❎ and "shoot" or "tele"),40,86,btn(❎) and 7 or 13)
-	textshadow("🅾️ (z): "..(tele_btn==🅾️ and "tele" or "shoot"),40,94,btn(🅾️) and 7 or 13)
 end
 
 --player
@@ -1014,6 +1013,13 @@ function clearlevel()
 		end
 		boss.enabled=false
 end
+
+function nextlvl()
+	sfx(37,-2)
+	extralives=mulligans
+	state="wipe"
+	wipe=cocreate(wipe_anim)
+end
 -->8
 --utils
 
@@ -1177,14 +1183,14 @@ function _introdraw()
 			if skipcount>30 then
 				music(-1)
 			end
-		else
-			skipcount=0
 		end
 
 		print("➡️ TO SKIP",89,120,13)
 		clip(89,120,39*skipcount/30,8)
 		print("➡️ TO SKIP",89,120,7)
 		clip()
+	else
+		skipcount=0
 	end
 		
 	local text=""
@@ -1700,24 +1706,26 @@ function _titleupdate()
 	title⧗+=1
 	if title⧗>60 then
 		if btnp(➡️) then
-			sfx(37,-2)
+--			sfx(37,-2)
 			lvl=skip_tutorial and 1 or 0
 			makelvl()
-			extralives=mulligans
-			state="wipe"
-			wipe=cocreate(wipe_anim)
+			nextlvl()
+--			extralives=mulligans
+--			state="wipe"
+--			wipe=cocreate(wipe_anim)
 		end
 		if btnp(⬅️) then
 			sfx(37,-2)
 			doslides()
 		end
 		if btnp(⬇️) and dget(7)==1 then
-			sfx(37,-2)
+--			sfx(37,-2)
 			lvl=13
 			makelvl()
-			extralives=mulligans
-			state="wipe"
-			wipe=cocreate(wipe_anim)
+			nextlvl()
+--			extralives=mulligans
+--			state="wipe"
+--			wipe=cocreate(wipe_anim)
 		end
 	end
 
@@ -1970,7 +1978,7 @@ function newflora()
 	f.growgoal=45 --grow rate
 	f.br=(150+flr(rnd(100)))*2 --bud rate
 	local r={}
-	r.growcount=-rnd(60) r.hit=-100
+	r.growcount,r.hit,r.r=-rnd(60),-100,9
 	c=0
 	local invalid=true
 	while invalid and c<100 do
@@ -1982,7 +1990,7 @@ function newflora()
 		local d=18+rnd(63-18)
 		--away from player
 		local a=aim_away(.25,.25)
-		r.x,r.y,r.r=64+cos(a)*d,64+sin(a)*d,9
+		r.x,r.y=64+cos(a)*d,64+sin(a)*d
 		--don't overlap other flora
 		for florasystem in all(fs) do
 			for flora in all(florasystem) do
@@ -1993,6 +2001,9 @@ function newflora()
 			end
 		end
 		::continuefloraspawn::
+	end
+	if lvl==0 then --tutorial
+		r.x,r.y=64,120
 	end
 	if c!=100 then
 		add(f,r)
