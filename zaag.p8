@@ -5,15 +5,16 @@ __lua__
 -- casey labrack
 
 --todo:
+--palette bug?
 
---debug=false
+--debug=true
 
 version=53
 _g=_ENV
 laserspeeds={.0025,.002,.0015}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
 ps,lz,zs,as,a2,fs,rs,bs,hs={},{},{},{},{},{},{},{},{}
-inner,outer_r={x=64,y=64,r=6,enabled=true},63
+inner,outer_r={x=64,y=64,r=8,enabled=true},63
 mulligans=2
 extralives=mulligans
 cp=dp--current pallete
@@ -66,8 +67,9 @@ tips={
 	{"if it's weird-looking,","shoot it"},
 	{"a zaag tail shows","its speed and direction"},
 	{"in two-pilot missions,","please try to limit","friendly fire incidents"},
-	{"teleport energy is shared","in two-pilot missions"},
+	{"in two-pilot missions,","teleport energy is shared"},
 	{"don't panic"},
+	{"losing is fun!","exploding is, uh, fun!"},
 }
 
 function _init()
@@ -344,7 +346,7 @@ for p in all(ps) do
 	if p.enabled then
 		-- player vs. obstacles
 		for v in all(rs) do
-			if touching(p,v) then died(p) end
+			if touching(p,v) then died(p,v) end
 		end
 
 		--player vs. homing bombs
@@ -488,11 +490,18 @@ end --update
 function died(player,cause)
 	if state~="running" then return end
 	sfx(13)
-	shake+=20
+	
+	--screenshake
+	shake=30
+	local cdx,cdy=cause and cause.dx or player.dx, cause and cause.dy or player.dy
+	hitangle=atan2(cdx,cdy)
+	hitmag=dist(cdx,cdy,0,0)
+	hitmag=max(1,hitmag*30)
+	
 	if player.enabled then
 		player.enabled=false
 		player.thrusting=false
-		player:death(cause)
+		player:death(cdx,cdy)
 	end
 
 	if not ps[1].enabled and not ps[2].enabled then
@@ -518,8 +527,8 @@ camera()
 if sleep<=0 then --hitstop, then shake
 	if shake>0 then
 		if screenshake then
-			local a=rnd()
-			local mag=(shake/8)^2
+			local a=hitangle+rndr(-.05,.05)
+			local mag=hitmag*(shake/20)^2
 			camera(cos(a)*mag,sin(a)*mag)
 		end
 		shake-=1
@@ -1270,7 +1279,7 @@ there's no time to disable them
 		text=text.."good luck!"
 	end
 	rect(0,13,127,47,6)
-	print("NANOMETERS: "..nanos,1,49,13)
+	print("MICRONS: "..nanos,1,49,13)
 	pal(hidepal)
 	--126 width x 34 height
 	if pat>0 then
@@ -1363,7 +1372,7 @@ function _outrodraw ()
 	camera()
 
 	if zoom⧗>360 then
-		cprint("⬆️ endless mode",64,67,13)
+		cprint("⬆️ endless mode",64,67,8)
 		cprint("⬇️ titlescreen",64,73,13)
 
 	 if btnp(⬆️) then
@@ -1434,13 +1443,14 @@ function initplayers()
 							end
 						end
 
-						x+=cos(a)*h
-						y+=sin(a)*h
 						local lines=coords(_ENV)
 						_g.blink=cocreate(blink_anim)
 						coresume(_g.blink,lines)
 						_g.charge=0
 						sfx(22)
+						
+						x+=cos(a)*h
+						y+=sin(a)*h
 					else
 						if tick-_g.hopfailtick>4 then
 							_g.hopfail=true
@@ -1548,12 +1558,9 @@ function initplayers()
 				enabled=true
 			end,
 
-			death=function(_ENV,cause)
+			death=function(_ENV,cdx,cdy)
 				local lines=coords(_ENV)
-				local cdx=cause and cause.dx or dx
-				local cdy=cause and cause.dy or dy
 				for l in all(lines) do
---					l.dx,l.dy=cause.dx or dx,cause.dy or dy
 					l.dx,l.dy=cdx,cdy
 					l.midx,l.midy=(l.x1+l.x2)/2,(l.y1+l.y2)/2
 					l.dr=rnd(.025) l.r=atan2(l.x2-l.x1,l.y2-l.y1)
@@ -1605,12 +1612,10 @@ function initplayers()
 end
 
 function blink_anim(lines)
-	local grays,duration={7,6,13,1},8
+	local grays,duration={7,6,13,1},12
 	while duration>=0 do
-		local pct=(8-duration)/8
-		local idx=ceil(pct*#grays)
 		for l in all(lines) do
-			line(l.x1,l.y1,l.x2,l.y2,grays[idx])
+			line(l.x1,l.y1,l.x2,l.y2,11)
 		end
 		duration-=1
 		yield()
@@ -1761,17 +1766,10 @@ function _titledraw()
 		end
 		
 		color(1)
---		print("cASEY",108,117)
---		print("lABRACK",100,122)
 		print("cASEY\nlABRACK",1,117)
 
 		print("2PLAYER"..(ps[2].playing and "!" or "?"),
 		96,123,ps[2].playing and 12 or 1)
-
-		
---		print("lABRACK",100,122)
---
---		print("V."..version,1,122)
 end
 -->8
 -- enemies
@@ -2354,7 +2352,7 @@ __sfx__
 000200001b53316533115330c5230a52307513055130351300513005031b5031a7031a7031a703007030070300703160030070300703007030070300703007030070300703007030070300703007030070300703
 01020000060500a0501005020050330501c000290002f000060500a05010050200503305000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01010000004500145007450174502a450134002040026400004500145007450174502a450004000040000400004500145007450174502a4500040000400004000040000400004000040000400004000040000400
-0110000010070100701007010070100701007010070100700f0700f0700f0700f0700e0700f0700e0700d0700d0700d0700d0720d0720d0720d0720d0700d0700c0700c0700c0700c07010070110701107011070
+0110000010540105401054010540105401054010540105400f5400f5400f5400f5400e5400f5400e5400d5400d5400d5400d5420d5420d5420d5420d5400d5400c5400c5400c5400c54010540115401154011540
 011000000c0500c0500c0500c0500c0500c0500c0500c0500b0500b0500b0500b0500b0500b0500b0500a0500a0500a0500a0500a0500a0500a0500a0500a0500905009050090500905000000000000000000000
 011000000a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a0500a050000000000000000
 011400000640014400114000000006400084000540000000064001440011400000000640008400054000000006400144001140000000064000840005400000000640014400114000000006400084000540000000
@@ -2403,9 +2401,9 @@ __music__
 00 41424344
 00 41424344
 00 41424344
-01 40797a43
-00 7b7c7d47
-02 7e7f8080
+01 25797a43
+00 257c7d47
+02 257f8080
 02 7b7c4c80
 00 80808080
 00 7b7c8044
