@@ -4,12 +4,9 @@ __lua__
 -- zaag
 -- casey labrack
 
---todo:
---palette bug?
-
 --debug=true
 
-version=53
+version=97
 _g=_ENV
 laserspeeds={.0025,.002,.0015}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
@@ -86,10 +83,10 @@ function _init()
 	
 	doslides()
 
-	menuitem(1, "swap ❎/🅾️ btns", btns_toggle)
-	menuitem(2, "intro tau: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
-	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
-	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(3, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(4, "swap ❎/🅾️ btns", btns_toggle)
 end
 
 function _update60()
@@ -127,20 +124,20 @@ end
 function tutorial_toggle()
 	skip_tutorial=not skip_tutorial
 	dset(6,(skip_tutorial and 1 or 0))
-	menuitem(2, "intro tau: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
 	return true
 end
 
 function dethgiftoggle()
 	deathgifs=not deathgifs
 	dset(1,(deathgifs and 1 or 0))
-	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	return true
 end
 
 function screenshake_toggle()
 	screenshake=not screenshake
-	menuitem(4, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
+	menuitem(3, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
 	dset(4,screenshake and 0 or 1)
 	return true
 end
@@ -425,7 +422,7 @@ for b in all(bs) do
 				end
 			end
 			for p in all(ps) do
-				if b.id~=p.id and p.enabled and touching(b,p) then
+				if b.id~=p.id and p.enabled and touching(b,p,2) then
 					p.dx+=b.dx/4
 					p.dy+=b.dy/4
 					b:splash()
@@ -466,8 +463,6 @@ if ps[1].enabled or ps[2].enabled then
 		lvl+=1
 		makelvl()
 		nextlvl()
---		wipe=cocreate(wipe_anim)
---		state="wipe"
 	end
 end
 
@@ -496,7 +491,7 @@ function died(player,cause)
 	local cdx,cdy=cause and cause.dx or player.dx, cause and cause.dy or player.dy
 	hitangle=atan2(cdx,cdy)
 	hitmag=dist(cdx,cdy,0,0)
-	hitmag=max(1,hitmag*30)
+	hitmag=max(1,hitmag*20)
 	
 	if player.enabled then
 		player.enabled=false
@@ -516,9 +511,11 @@ end
 function _maindraw()
 cls()
 
---tau zero instructions
+--level zero instructions
 if lvl==0 and (state=="running" or state=="setup") then
-	textshadow("blast the zoids.\ncleanse the tau.",32,24,13)
+--	textshadow(" blast the zaag.\ncleanse the level.",32,24,13)
+	cprint("blast the zaag.",64,24,13)
+	cprint("cleanse the level.",64,32,13)
 	textshadow("❎ (x): "..(fire_btn==❎ and "shoot" or "tele"),40,86,btn(❎) and 7 or 13)
 	textshadow("🅾️ (z): "..(tele_btn==🅾️ and "tele" or "shoot"),40,94,btn(🅾️) and 7 or 13)
 end
@@ -528,7 +525,7 @@ if sleep<=0 then --hitstop, then shake
 	if shake>0 then
 		if screenshake then
 			local a=hitangle+rndr(-.05,.05)
-			local mag=hitmag*(shake/20)^2
+			local mag=hitmag*(shake/30)^2
 			camera(cos(a)*mag,sin(a)*mag)
 		end
 		shake-=1
@@ -697,7 +694,7 @@ if boss.enabled then
 end
 
 if state=="running" or state=="setup" then
-	print("tau "..12-lvl,0,2,7)
+	print("level "..12-lvl,0,2,7)
 	for i=1,extralives do
 		spr(22,i*6-6,10)
 	end
@@ -756,7 +753,7 @@ sprice={
 
 function makelvl()
 	budget=lvl+2
-	lvls={roids=3}
+	lvls={roids=4}
 
 	while budget>0 do
 
@@ -933,7 +930,7 @@ function gameover()
 			ytext+=6
 		end
 				
-		print("lowest tau:  "..(12-lvl).."\nlowest ever: "..(12-dget(5)),34,100,13)
+		print("lowest level:  "..(12-lvl).."\nlowest ever: "..(12-dget(5)),34,100,13)
 		if pb then
 			print("   new best!",34,114,rnd(funcolors))		
 		end		
@@ -950,7 +947,7 @@ function deathmsg_anim()
 		local mulls=extralives==1 and " spare" or " spares"
 --		local mulls=extralives==1 and " mulligan" or " mulligans"
 		cprint(""..extralives..mulls,64,86,13)
-		cprint("left this tau",64,94,13)
+		cprint("left this level",64,94,13)
 		for i=1,extralives+1 do
 			if i==extralives+1 then
 				if tick%20>10 then
@@ -1234,7 +1231,7 @@ function _introdraw()
 		camera()
 		clip()
 		text=
-[[welcome to the tau clusters.]]
+[[welcome inside the specimen.]]
 		nanos=flr(9/pct)
 	end
 
@@ -1246,7 +1243,7 @@ function _introdraw()
 armed, and most importantly,
 disposable.
 
-you'll get only 2 spares per tau
+you get only 2 spares per level
 (for insurance reasons).
 ]]			
 	end
@@ -1255,7 +1252,7 @@ you'll get only 2 spares per tau
 		hidepal[9],hidepal[11],hidepal[8],hidepal[14]=nil,nil,nil,nil
 		text=
 [[the threat: zaagella flora. 
-it spreads from beneath tau 1.
+it spreads from beneath level 1.
 
 your blaster cuts through zaag,
 but only fires one-at-a-time
