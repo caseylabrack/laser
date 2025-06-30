@@ -6,7 +6,7 @@ __lua__
 
 --debug=true
 
-version=97
+version=98
 _g=_ENV
 laserspeeds={.0025,.002,.0015}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
@@ -83,10 +83,11 @@ function _init()
 	
 	doslides()
 
-	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
-	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
-	menuitem(3, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
-	menuitem(4, "swap ❎/🅾️ btns", btns_toggle)
+	menuitem(1, "2player: off", toggle2p)
+	menuitem(2, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(5, "swap ❎/🅾️ btns", btns_toggle)
 end
 
 function _update60()
@@ -111,6 +112,11 @@ function _draw()
 	end
 end
 
+function toggle2p ()
+	ps[2].playing=not ps[2].playing
+	menuitem(1, "2player: "..(ps[2].playing and "on" or "off"), toggle2p)
+end
+
 function btns_toggle()
 	if fire_btn==❎ then
 		fire_btn=🅾️ tele_btn=❎
@@ -124,20 +130,20 @@ end
 function tutorial_toggle()
 	skip_tutorial=not skip_tutorial
 	dset(6,(skip_tutorial and 1 or 0))
-	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(2, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
 	return true
 end
 
 function dethgiftoggle()
 	deathgifs=not deathgifs
 	dset(1,(deathgifs and 1 or 0))
-	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	return true
 end
 
 function screenshake_toggle()
 	screenshake=not screenshake
-	menuitem(3, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
+	menuitem(4, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
 	dset(4,screenshake and 0 or 1)
 	return true
 end
@@ -295,7 +301,8 @@ end
 -- safe zones
 for z in all(zs) do
 	if z.state=="idle" then
-		if touching(ps[1],z) or (ps[2].playing and ps[2].enabled and touching(ps[2],z)) then
+		if (ps[1].enabled and touching(ps[1],z)) 
+			or (ps[2].enabled and touching(ps[2],z)) then
 			z.state="shrinking"
 		end
 	elseif z.state=="shrinking" then
@@ -336,7 +343,7 @@ for p in all(ps) do
 
 	p:update()
 
-	if not p.playing then break end
+--	if not p.playing then break end
 
 	bounds(p)
 
@@ -1231,7 +1238,7 @@ function _introdraw()
 		camera()
 		clip()
 		text=
-[[welcome inside the specimen.]]
+[[welcome inside the microverse.]]
 		nanos=flr(9/pct)
 	end
 
@@ -1292,7 +1299,6 @@ there's no time to disable them
 	print(text,1,65)
 	lpat=pat
 end
-
 
 function dooutro()
  zooms,zoom⧗,state,cp={},0,"outro",dp
@@ -1621,7 +1627,7 @@ end
 
 --always returns either p1 or p2
 function closestplayer(t)
-	if not ps[2].playing then return ps[1] end
+--	if not ps[2].playing then return ps[1] end
 	if not ps[2].enabled then return ps[1] end
 	if not ps[1].enabled then return ps[2] end
 	return distt(t,ps[1])<distt(t,ps[2]) and ps[1] or ps[2]
@@ -1740,9 +1746,9 @@ function _titleupdate()
 		end
 	end
 
-	if btnp()>255 then
-		ps[2].playing=not ps[2].playing
-	end
+--	if btnp()>255 then
+--		ps[2].playing=not ps[2].playing
+--	end
 end
 
 function _titledraw()
@@ -1762,11 +1768,13 @@ function _titledraw()
 			textshadow("  ⬆️ play\n⬇️ briefing",43,100,13)
 		end
 		
-		color(1)
-		print("cASEY\nlABRACK",1,117)
+--		print("cASEY\nlABRACK",1,117)
 
-		print("2PLAYER"..(ps[2].playing and "!" or "?"),
-		96,123,ps[2].playing and 12 or 1)
+--		print("2PLAYER"..(ps[2].playing and "!" or "?"),
+--		print("  mode:\n"..(ps[2].playing and "2player" or "1player"),
+		print("mode:\n"..(ps[2].playing and "2player" or "1player"),
+		1,117,ps[2].playing and 12 or 1)
+		print("V."..version,111,123,1)
 end
 -->8
 -- enemies
