@@ -83,11 +83,10 @@ function _init()
 	
 	doslides()
 
-	menuitem(1, "2player: off", toggle2p)
-	menuitem(2, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
-	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
-	menuitem(4, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
-	menuitem(5, "swap ❎/🅾️ btns", btns_toggle)
+	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(3, "screenshake: "..(screenshake and "on" or "off"), screenshake_toggle)
+	menuitem(4, "swap ❎/🅾️ btns", btns_toggle)
 end
 
 function _update60()
@@ -112,11 +111,6 @@ function _draw()
 	end
 end
 
-function toggle2p ()
-	ps[2].playing=not ps[2].playing
-	menuitem(1, "2player: "..(ps[2].playing and "on" or "off"), toggle2p)
-end
-
 function btns_toggle()
 	if fire_btn==❎ then
 		fire_btn=🅾️ tele_btn=❎
@@ -130,20 +124,20 @@ end
 function tutorial_toggle()
 	skip_tutorial=not skip_tutorial
 	dset(6,(skip_tutorial and 1 or 0))
-	menuitem(2, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
+	menuitem(1, "intro level: "..(skip_tutorial and "off" or "on"), tutorial_toggle)
 	return true
 end
 
 function dethgiftoggle()
 	deathgifs=not deathgifs
 	dset(1,(deathgifs and 1 or 0))
-	menuitem(3, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
+	menuitem(2, "death gifs: " ..(deathgifs and "on" or "off"), dethgiftoggle)
 	return true
 end
 
 function screenshake_toggle()
 	screenshake=not screenshake
-	menuitem(4, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
+	menuitem(3, screenshake and "screenshake: on" or "screenshake: off",screenshake_toggle)
 	dset(4,screenshake and 0 or 1)
 	return true
 end
@@ -1150,9 +1144,9 @@ bwp={ --fade to black
 
 function doslides()
 	state="intro"
---	if not debug then 
+	if not debug then 
 		music(0) 
---	end
+	end
 	--this iter music pattern,
 	--pattern last iter,
 	--ticks this pattern
@@ -1238,7 +1232,7 @@ function _introdraw()
 		camera()
 		clip()
 		text=
-[[welcome inside the microverse.]]
+[[welcome to the micro-biosphere]]
 		nanos=flr(9/pct)
 	end
 
@@ -1246,7 +1240,7 @@ function _introdraw()
 	if mid(pat,1,2)==pat then
 		hidepal[7],hidepal[1]=7,9
 		text=
-[[your craft is manueverable,
+[[your instrument is maneuverable,
 armed, and most importantly,
 disposable.
 
@@ -1745,10 +1739,10 @@ function _titleupdate()
 			nextlvl()
 		end
 	end
-
---	if btnp()>255 then
---		ps[2].playing=not ps[2].playing
---	end
+	
+	--2player
+	if btnp(➡️) then ps[2].playing=true end
+	if btnp(⬅️) then ps[2].playing=false end
 end
 
 function _titledraw()
@@ -1762,18 +1756,16 @@ function _titledraw()
 		pal()
 		
 		if title⧗>60 then
+			textshadow("  ⬆️ play",43,91,13)
+			textshadow("⬇️ briefing",43,98,13)
+			textshadow((ps[2].playing and "⬅️ 2player" or "1player ➡️"),46,105,13)
 			if dget(7)==1 then
 				textshadow("❎ endless",45,115,8)	
 			end
-			textshadow("  ⬆️ play\n⬇️ briefing",43,100,13)
 		end
 		
 --		print("cASEY\nlABRACK",1,117)
 
---		print("2PLAYER"..(ps[2].playing and "!" or "?"),
---		print("  mode:\n"..(ps[2].playing and "2player" or "1player"),
-		print("mode:\n"..(ps[2].playing and "2player" or "1player"),
-		1,117,ps[2].playing and 12 or 1)
 		print("V."..version,111,123,1)
 end
 -->8
