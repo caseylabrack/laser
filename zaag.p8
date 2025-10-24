@@ -7,7 +7,7 @@ __lua__
 --an asteroids-like 
 --with lasers and mulligans
 
-version=100
+version=101
 _g=_ENV
 laserspeeds={.0025,.002,.0015}
 --players, lasers, safe zones, animations (coroutines), animations in draw phase, flowers, roids, bullets, homing bombs
@@ -72,7 +72,7 @@ tips={
 
 function _init()
 	poke(0x5f34,0x2)--inverse fill
-	cartdata("caseylabrack_zaag")
+	cartdata("caseylabrack_zaag2")
 	local swapped=dget(0)==1
 	fire_btn = (not swapped) and ❎ or 🅾️
 	tele_btn = (not swapped) and 🅾️ or ❎
